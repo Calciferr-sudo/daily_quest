@@ -3,12 +3,7 @@ const homeScreen = document.getElementById('home-screen');
 const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
 const gameOverScreen = document.getElementById('gameOverScreen');
-// Added an error message element, ensure this exists in your HTML or errors will use alert
-const errorMessageDisplay = document.createElement('div');
-errorMessageDisplay.id = 'error-message';
-errorMessageDisplay.classList.add('hidden');
-document.body.prepend(errorMessageDisplay);
-
+const errorMessageDisplay = document.getElementById('error-message'); // Ensure this element exists in HTML
 
 // Home Screen Elements
 const usernameInput = document.getElementById('username-input');
@@ -29,12 +24,12 @@ const leaveLobbyBtn = document.getElementById('leave-lobby-btn');
 const questionCounter = document.getElementById('question-counter');
 const timerDisplay = document.getElementById('timer');
 const questionText = document.getElementById('question-text');
-const optionsContainer = document.getElementById('options-container'); // This was for multiple choice, now used for textarea
-const answerInput = document.getElementById('answer-input'); // New for text area
-const answerCountDisplay = document.getElementById('answer-count-display'); // New for text area count
+const optionsContainer = document.getElementById('options-container'); // Container for answer input
+const answerInput = document.getElementById('answer-input'); // Textarea for answers
+const answerCountDisplay = document.getElementById('answer-count-display'); // Display for answer count
 const submitAnswerBtn = document.getElementById('submit-answer-btn');
 const nextQuestionBtn = document.getElementById('next-question-btn');
-const scoreboard = document.getElementById('scoreboard');
+// Scoreboard elements
 const player1NameGame = document.getElementById('player1NameGame');
 const player1ScoreGame = document.getElementById('player1ScoreGame');
 const player1AnswerStatus = document.getElementById('player1AnswerStatus');
@@ -51,13 +46,14 @@ const returnToHomeButton = document.getElementById('returnToHomeButton');
 
 
 // --- Game State Variables ---
-const BACKEND_URL = 'https://quiz-backend-bs3b.onrender.com'; // Make sure this matches your backend URL
+const BACKEND_URL = 'https://quiz-backend-4u7t.onrender.com'; // **<<<<< YOUR RENDER BACKEND URL HERE >>>>>**
 let currentUserId = localStorage.getItem('userId');
 let currentUsername = localStorage.getItem('username');
 let currentRoomId = null;
 let roomState = null; // Stores the current state of the room from the backend
 let timerInterval = null;
 let countdownTime = 0;
+
 
 // --- Socket.IO Connection ---
 const socket = io(BACKEND_URL); // Connect to your backend's Socket.IO server
@@ -78,14 +74,36 @@ socket.on('disconnect', () => {
 });
 
 socket.on('connect_error', (error) => {
-    console.error('Socket.IO connection error:', error);
+    console.error('Socket.IO connection error:', error.message);
     showErrorMessage('Could not connect to game server. Is the backend running?');
+});
+
+socket.on('error', (message) => {
+    console.error('Server emitted error:', message);
+    showErrorMessage(`Server Error: ${message}`);
+});
+
+socket.on('forceAuth', () => {
+    console.log('Server forcing re-authentication.');
+    showErrorMessage('Your session expired or was invalid. Please set your username again.');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('username');
+    currentUserId = null;
+    currentUsername = null;
+    showScreen(homeScreen);
+    usernameInput.value = '';
 });
 
 socket.on('roomUpdate', (updatedRoomState) => {
     console.log('Room update received:', updatedRoomState);
     roomState = updatedRoomState; // Update global room state
     updateUI(roomState); // Update UI based on the new state
+});
+
+socket.on('roomCreated', (data) => {
+    console.log(`Room ${data.roomId} created and joined.`);
+    currentRoomId = data.roomId;
+    // UI update will happen via roomUpdate event
 });
 
 socket.on('roomDeleted', (data) => {
@@ -97,6 +115,11 @@ socket.on('roomDeleted', (data) => {
         roomState = null;
         showScreen(homeScreen);
     }
+});
+
+socket.on('answerSubmittedConfirmation', (data) => {
+    console.log(`Answer submitted. Earned ${data.scoreEarned} points.`);
+    // You could show a small temporary message like "Answers received!"
 });
 
 // --- Utility Functions ---
@@ -112,9 +135,11 @@ function showErrorMessage(message) {
     console.error("Error:", message);
     errorMessageDisplay.textContent = message;
     errorMessageDisplay.classList.remove('hidden');
-    setTimeout(() => {
-        errorMessageDisplay.classList.add('hidden');
-    }, 5000); // Hide after 5 seconds
+    // Clear any existing animation before re-adding
+    errorMessageDisplay.style.animation = 'none';
+    errorMessageDisplay.offsetHeight; /* trigger reflow */
+    errorMessageDisplay.style.animation = null;
+    errorMessageDisplay.style.animation = 'fadeOut 5s forwards';
 }
 
 // Function to safely parse user input for 8 answers
@@ -129,11 +154,12 @@ function parseAnswers(text) {
 
 
 // --- API Call Helper (for initial user setup, not game state updates) ---
+// This still uses HTTP for initial user authentication/username update
 async function apiCall(endpoint, method = 'GET', data = null) {
     const headers = {
         'Content-Type': 'application/json',
-        'x-user-id': currentUserId, // Always send user ID
-        'x-username': currentUsername // Always send username
+        'x-user-id': currentUserId || '', // Always send user ID if available
+        'x-username': currentUsername || '' // Always send username if available
     };
 
     const config = {
@@ -169,13 +195,15 @@ async function initializeUser() {
         showScreen(homeScreen);
         usernameInput.value = ''; // Clear previous input
     } else {
-        // User ID exists, try to authenticate with backend to get current username
+        // User ID exists, try to re-authenticate with backend to get current username
         try {
             const result = await apiCall('/api/auth/anonymous', 'POST');
             currentUsername = result.username;
             localStorage.setItem('username', currentUsername);
             usernameInput.value = currentUsername; // Prefill username input
-            socket.emit('registerUserSocket', currentUserId); // Register socket for existing user
+            if (socket.connected) {
+                socket.emit('registerUserSocket', currentUserId); // Register socket for existing user
+            }
             showScreen(homeScreen); // Go to home screen after initialization
         } catch (error) {
             console.error("Failed to re-authenticate user:", error);
@@ -209,7 +237,9 @@ saveUsernameBtn.addEventListener('click', async () => {
         currentUsername = result.username;
         localStorage.setItem('userId', currentUserId);
         localStorage.setItem('username', currentUsername);
-        socket.emit('registerUserSocket', currentUserId); // Register socket with new/updated user ID
+        if (socket.connected) {
+            socket.emit('registerUserSocket', currentUserId); // Register socket with new/updated user ID
+        }
         showScreen(homeScreen); // Stay on home after saving username
         showErrorMessage('Username saved successfully!');
     } catch (error) {
@@ -218,9 +248,9 @@ saveUsernameBtn.addEventListener('click', async () => {
 });
 
 
-// --- Room Management (Using HTTP for initial actions, then Socket.IO for updates) ---
+// --- Room Management (Using Socket.IO for all actions) ---
 
-createRoomBtn.addEventListener('click', async () => {
+createRoomBtn.addEventListener('click', () => {
     if (!currentUserId) {
         showErrorMessage('Please set your username first.');
         return;
@@ -230,19 +260,13 @@ createRoomBtn.addEventListener('click', async () => {
         return;
     }
     const difficulty = difficultySelect.value;
-    try {
-        // Send initial HTTP request to create room
-        const roomResult = await apiCall('/api/rooms/create', 'POST', { difficulty });
-        currentRoomId = roomResult.roomId;
-        // Room state will be received via socket.io `roomUpdate`
-        showScreen(lobbyScreen);
-        showErrorMessage(`Room ${currentRoomId} created!`);
-    } catch (error) {
-        // Error message already handled by apiCall
-    }
+    // Emit createRoom event to backend
+    socket.emit('createRoom', { userId: currentUserId, username: currentUsername, difficulty: difficulty });
+    // UI update will happen via roomUpdate event from server
+    showErrorMessage('Creating room...');
 });
 
-joinRoomBtn.addEventListener('click', async () => {
+joinRoomBtn.addEventListener('click', () => {
     if (!currentUserId) {
         showErrorMessage('Please set your username first.');
         return;
@@ -256,16 +280,10 @@ joinRoomBtn.addEventListener('click', async () => {
         showErrorMessage('Please enter a Room ID.');
         return;
     }
-    try {
-        // Send initial HTTP request to join room
-        const roomResult = await apiCall(`/api/rooms/join/${roomId}`, 'POST');
-        currentRoomId = roomResult.roomId;
-        // Room state will be received via socket.io `roomUpdate`
-        showScreen(lobbyScreen);
-        showErrorMessage(`Joined room ${currentRoomId}!`);
-    } catch (error) {
-        // Error message already handled by apiCall
-    }
+    // Emit joinRoom event to backend
+    socket.emit('joinRoom', { userId: currentUserId, username: currentUsername, roomId: roomId });
+    // UI update will happen via roomUpdate event from server
+    showErrorMessage(`Joining room ${roomId}...`);
 });
 
 leaveLobbyBtn.addEventListener('click', () => {
@@ -299,21 +317,23 @@ leaveGameButton.addEventListener('click', () => {
 
 // --- UI Update Logic (driven by Socket.IO 'roomUpdate' event) ---
 function updateUI(room) {
-    if (room.status === 'waiting' && homeScreen.classList.contains('hidden')) {
+    if (!room) { // Handle cases where room might be null after deletion
+        showScreen(homeScreen);
+        return;
+    }
+
+    if (room.status === 'waiting') {
         updateLobbyUI(room);
         showScreen(lobbyScreen);
-    } else if (room.status === 'playing' && gameScreen.classList.contains('hidden')) {
-        showScreen(gameScreen);
-        startGameUI(room); // Initialize game screen UI
-    } else if (room.status === 'finished' && gameOverScreen.classList.contains('hidden')) {
+    } else if (room.status === 'playing') {
+        if (gameScreen.classList.contains('hidden')) { // Only initialize if just entering game screen
+            startGameUI(room);
+        }
+        updateGameUI(room); // Always update game screen
+    } else if (room.status === 'finished') {
         showScreen(gameOverScreen);
         updateResultsScreen(room);
         clearInterval(timerInterval); // Stop timer
-    }
-
-    // Always update common elements based on current screen
-    if (room.status === 'playing') {
-        updateGameUI(room);
     }
 }
 
@@ -391,10 +411,11 @@ function updateGameUI(room) {
         player1NameGame.textContent = '';
         player1ScoreGame.textContent = '0';
         player1AnswerStatus.textContent = '';
+        player1AnswerStatus.className = 'player-status';
     }
     
     if (p2) {
-        player2NameGame.textContent = `${p2.username} ${p2.id === currentUserId ? '(Opponent)' : ''}`;
+        player2NameGame.textContent = `${p2.username} ${p2.id === currentUserId ? '(You)' : ''}`;
         player2ScoreGame.textContent = p2.score;
         player2AnswerStatus.textContent = p2.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
         player2AnswerStatus.className = p2.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
@@ -402,6 +423,7 @@ function updateGameUI(room) {
         player2NameGame.textContent = '';
         player2ScoreGame.textContent = '0';
         player2AnswerStatus.textContent = '';
+        player2AnswerStatus.className = 'player-status';
     }
 
     // Host specific UI for next question button
