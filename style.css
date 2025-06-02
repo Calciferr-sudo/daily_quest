@@ -38,15 +38,17 @@ body {
     border-radius: 16px;
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4); /* Stronger, softer shadow */
     width: 100%;
-    max-width: 700px; /* Wider max-width for better content display */
+    /* --- KEY CHANGE FOR LAPTOP UI --- */
+    max-width: 850px; /* Set a comfortable max-width for laptop screens */
+    /* -------------------------------- */
     text-align: center;
     border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle border */
-    position: relative; /* For potential future absolute positioning */
-    overflow: hidden; /* Ensure rounded corners clip content */
+    position: relative;
+    overflow: hidden;
 }
 
 h1 {
-    font-size: 3.5rem; /* Even larger heading */
+    font-size: 3.5rem;
     color: var(--primary-color);
     margin-bottom: 30px;
     font-weight: 700;
@@ -95,7 +97,7 @@ h3 {
 .input-field:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.5); /* More prominent focus ring */
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.5);
 }
 
 .btn {
@@ -105,11 +107,11 @@ h3 {
     font-size: 1.2rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease-in-out; /* All for smoother transitions */
+    transition: all 0.2s ease-in-out;
     display: inline-block;
     letter-spacing: 0.5px;
     position: relative;
-    overflow: hidden; /* For button effects */
+    overflow: hidden;
     z-index: 1;
 }
 
@@ -143,7 +145,7 @@ h3 {
 }
 
 .btn-primary {
-    background: linear-gradient(45deg, var(--primary-color), #7f9cf5); /* Gradient */
+    background: linear-gradient(45deg, var(--primary-color), #7f9cf5);
     color: white;
 }
 
@@ -152,7 +154,7 @@ h3 {
 }
 
 .btn-secondary {
-    background: linear-gradient(45deg, var(--secondary-color), #5a67d8); /* Gradient */
+    background: linear-gradient(45deg, var(--secondary-color), #5a67d8);
     color: var(--text-light);
 }
 
@@ -161,7 +163,7 @@ h3 {
 }
 
 .btn-danger {
-    background: linear-gradient(45deg, var(--danger-color), #f687b3); /* Gradient */
+    background: linear-gradient(45deg, var(--danger-color), #f687b3);
     color: white;
 }
 
@@ -202,7 +204,6 @@ h3 {
 .text-purple-400 { color: var(--accent-purple); }
 .text-teal-400 { color: #2dd4bf; }
 .text-rose-400 { color: var(--warning-color); }
-.text-green-400 { color: var(--success-color); }
 
 .bg-slate-700 { background-color: #334155; }
 
@@ -306,30 +307,30 @@ ul {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 30px;
-    padding: 0 10px; /* Some padding for header elements */
+    padding: 0 10px;
 }
 
 #question-text {
-    min-height: 100px; /* More space for questions */
+    min-height: 100px;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 10px; /* Inner padding for text */
+    padding: 10px;
 }
 
 .options-grid {
     display: grid;
     gap: 15px;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Larger min-width for options */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
 .options-grid-item {
-    padding: 18px 20px; /* More padding for touch targets */
+    padding: 18px 20px;
     background-color: var(--primary-color);
     color: white;
     border-radius: 10px;
     text-align: center;
-    font-size: 1.15rem; /* Slightly larger font */
+    font-size: 1.15rem;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease-in-out;
@@ -346,7 +347,7 @@ ul {
 .option-button.selected {
     background-color: var(--secondary-color);
     border: 2px solid var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.6); /* Stronger selection highlight */
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.6);
 }
 
 .option-button.correct {
@@ -372,7 +373,7 @@ ul {
 .scoreboard {
     display: flex;
     justify-content: space-around;
-    gap: 25px; /* More gap */
+    gap: 25px;
     margin-top: 30px;
 }
 
@@ -430,34 +431,44 @@ ul {
 
 /* --- Responsive Adjustments --- */
 
-@media (max-width: 768px) {
+@media (max-width: 992px) { /* Adjust for larger tablets and smaller laptops */
     .container {
-        padding: 30px;
+        max-width: 700px;
+        padding: 35px;
+    }
+    h1 { font-size: 3rem; }
+    h2 { font-size: 2.2rem; }
+    h3 { font-size: 1.6rem; }
+    .btn { font-size: 1.1rem; padding: 12px 25px; }
+    .options-grid { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+    .scoreboard-card .player-name { font-size: 1.2rem; }
+    .scoreboard-card .player-score { font-size: 1.8rem; }
+}
+
+@media (max-width: 768px) { /* Standard tablet portrait */
+    .container {
+        padding: 25px;
         border-radius: 14px;
     }
 
     h1 {
-        font-size: 2.8rem;
-        margin-bottom: 25px;
+        font-size: 2.5rem;
+        margin-bottom: 20px;
     }
 
     h2 {
-        font-size: 2rem;
+        font-size: 1.8rem;
         margin-bottom: 20px;
     }
 
     h3 {
-        font-size: 1.5rem;
+        font-size: 1.4rem;
         margin-bottom: 15px;
     }
 
     .label, .input-field, .btn, .options-grid-item {
         font-size: 1rem;
         padding: 12px;
-    }
-
-    .btn {
-        padding: 12px 25px;
     }
 
     .options-grid {
@@ -489,7 +500,7 @@ ul {
     }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 480px) { /* Mobile phones */
     body {
         padding: 15px;
     }
@@ -500,17 +511,17 @@ ul {
     }
 
     h1 {
-        font-size: 2.2rem;
+        font-size: 2rem;
         margin-bottom: 15px;
     }
 
     h2 {
-        font-size: 1.7rem;
+        font-size: 1.5rem;
         margin-bottom: 15px;
     }
 
     h3 {
-        font-size: 1.3rem;
+        font-size: 1.2rem;
         margin-bottom: 10px;
     }
 
