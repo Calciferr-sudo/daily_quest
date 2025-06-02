@@ -3,7 +3,12 @@ const homeScreen = document.getElementById('home-screen');
 const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
 const gameOverScreen = document.getElementById('gameOverScreen');
-const errorMessage = document.getElementById('error-message'); // Ensure this element exists if used for error messages
+// Added an error message element, ensure this exists in your HTML or errors will use alert
+const errorMessageDisplay = document.createElement('div');
+errorMessageDisplay.id = 'error-message';
+errorMessageDisplay.classList.add('hidden');
+document.body.prepend(errorMessageDisplay);
+
 
 // Home Screen Elements
 const usernameInput = document.getElementById('username-input');
@@ -39,8 +44,8 @@ const player2AnswerStatus = document.getElementById('player2AnswerStatus');
 const leaveGameButton = document.getElementById('leaveGameButton');
 
 // Game Over Screen Elements
-const finalScoresList = document.getElementById('finalScoresList'); // Corrected ID from 'final-scores'
-const winnerInfo = document.getElementById('winnerInfo'); // Corrected ID from 'winner'
+const finalScoresList = document.getElementById('finalScoresList');
+const winnerInfo = document.getElementById('winnerInfo');
 const playAgainButton = document.getElementById('playAgainButton');
 const returnToHomeButton = document.getElementById('returnToHomeButton');
 
@@ -51,9 +56,48 @@ let currentUserId = localStorage.getItem('userId');
 let currentUsername = localStorage.getItem('username');
 let currentRoomId = null;
 let roomState = null; // Stores the current state of the room from the backend
-let pollingInterval = null;
 let timerInterval = null;
 let countdownTime = 0;
+
+// --- Socket.IO Connection ---
+const socket = io(BACKEND_URL); // Connect to your backend's Socket.IO server
+
+socket.on('connect', () => {
+    console.log('Connected to Socket.IO server:', socket.id);
+    if (currentUserId) {
+        // Register user with socket ID on the server after connection
+        socket.emit('registerUserSocket', currentUserId);
+    }
+});
+
+socket.on('disconnect', () => {
+    console.log('Disconnected from Socket.IO server.');
+    // Handle disconnections (e.g., show a message, try to reconnect)
+    showErrorMessage('Disconnected from server. Please refresh or check connection.');
+    clearInterval(timerInterval);
+});
+
+socket.on('connect_error', (error) => {
+    console.error('Socket.IO connection error:', error);
+    showErrorMessage('Could not connect to game server. Is the backend running?');
+});
+
+socket.on('roomUpdate', (updatedRoomState) => {
+    console.log('Room update received:', updatedRoomState);
+    roomState = updatedRoomState; // Update global room state
+    updateUI(roomState); // Update UI based on the new state
+});
+
+socket.on('roomDeleted', (data) => {
+    console.log('Room deleted:', data.roomId);
+    if (currentRoomId === data.roomId) {
+        showErrorMessage(data.message || 'The room you were in has been deleted.');
+        clearInterval(timerInterval);
+        currentRoomId = null;
+        roomState = null;
+        showScreen(homeScreen);
+    }
+});
 
 // --- Utility Functions ---
 function showScreen(screen) {
@@ -66,15 +110,11 @@ function showScreen(screen) {
 
 function showErrorMessage(message) {
     console.error("Error:", message);
-    if (errorMessage) {
-        errorMessage.textContent = message;
-        errorMessage.classList.remove('hidden');
-        setTimeout(() => {
-            errorMessage.classList.add('hidden');
-        }, 5000); // Hide after 5 seconds
-    } else {
-        alert("Error: " + message); // Fallback if no error message element
-    }
+    errorMessageDisplay.textContent = message;
+    errorMessageDisplay.classList.remove('hidden');
+    setTimeout(() => {
+        errorMessageDisplay.classList.add('hidden');
+    }, 5000); // Hide after 5 seconds
 }
 
 // Function to safely parse user input for 8 answers
@@ -88,7 +128,7 @@ function parseAnswers(text) {
 }
 
 
-// --- API Call Helper ---
+// --- API Call Helper (for initial user setup, not game state updates) ---
 async function apiCall(endpoint, method = 'GET', data = null) {
     const headers = {
         'Content-Type': 'application/json',
@@ -135,6 +175,7 @@ async function initializeUser() {
             currentUsername = result.username;
             localStorage.setItem('username', currentUsername);
             usernameInput.value = currentUsername; // Prefill username input
+            socket.emit('registerUserSocket', currentUserId); // Register socket for existing user
             showScreen(homeScreen); // Go to home screen after initialization
         } catch (error) {
             console.error("Failed to re-authenticate user:", error);
@@ -168,6 +209,7 @@ saveUsernameBtn.addEventListener('click', async () => {
         currentUsername = result.username;
         localStorage.setItem('userId', currentUserId);
         localStorage.setItem('username', currentUsername);
+        socket.emit('registerUserSocket', currentUserId); // Register socket with new/updated user ID
         showScreen(homeScreen); // Stay on home after saving username
         showErrorMessage('Username saved successfully!');
     } catch (error) {
@@ -176,20 +218,25 @@ saveUsernameBtn.addEventListener('click', async () => {
 });
 
 
-// --- Room Management ---
+// --- Room Management (Using HTTP for initial actions, then Socket.IO for updates) ---
 
 createRoomBtn.addEventListener('click', async () => {
     if (!currentUserId) {
         showErrorMessage('Please set your username first.');
         return;
     }
+    if (!socket.connected) {
+        showErrorMessage('Not connected to server. Please wait or refresh.');
+        return;
+    }
     const difficulty = difficultySelect.value;
     try {
-        const room = await apiCall('/api/rooms/create', 'POST', { difficulty });
-        currentRoomId = room.roomId;
-        startRoomPolling(currentRoomId);
+        // Send initial HTTP request to create room
+        const roomResult = await apiCall('/api/rooms/create', 'POST', { difficulty });
+        currentRoomId = roomResult.roomId;
+        // Room state will be received via socket.io `roomUpdate`
         showScreen(lobbyScreen);
-        updateLobbyUI(room);
+        showErrorMessage(`Room ${currentRoomId} created!`);
     } catch (error) {
         // Error message already handled by apiCall
     }
@@ -200,86 +247,58 @@ joinRoomBtn.addEventListener('click', async () => {
         showErrorMessage('Please set your username first.');
         return;
     }
+    if (!socket.connected) {
+        showErrorMessage('Not connected to server. Please wait or refresh.');
+        return;
+    }
     const roomId = roomIdInput.value.trim().toUpperCase();
     if (!roomId) {
         showErrorMessage('Please enter a Room ID.');
         return;
     }
     try {
-        const room = await apiCall(`/api/rooms/join/${roomId}`, 'POST');
-        currentRoomId = room.roomId;
-        startRoomPolling(currentRoomId);
+        // Send initial HTTP request to join room
+        const roomResult = await apiCall(`/api/rooms/join/${roomId}`, 'POST');
+        currentRoomId = roomResult.roomId;
+        // Room state will be received via socket.io `roomUpdate`
         showScreen(lobbyScreen);
-        updateLobbyUI(room);
+        showErrorMessage(`Joined room ${currentRoomId}!`);
     } catch (error) {
         // Error message already handled by apiCall
     }
 });
 
-leaveLobbyBtn.addEventListener('click', async () => {
+leaveLobbyBtn.addEventListener('click', () => {
     if (!currentRoomId) return;
-    try {
-        const result = await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
-        clearInterval(pollingInterval);
-        clearInterval(timerInterval); // Clear timer if it was running
-        currentRoomId = null;
-        roomState = null;
-        showScreen(homeScreen);
-        if (result.message === 'Room deleted.') {
-            showErrorMessage('Lobby left. Room deleted.');
-        } else {
-            showErrorMessage('Left lobby successfully.');
-        }
-    } catch (error) {
-        // Error message already handled by apiCall
+    if (!socket.connected) {
+        showErrorMessage('Not connected to server. Please wait or refresh.');
+        return;
     }
+    socket.emit('leaveRoom', { roomId: currentRoomId, userId: currentUserId });
+    clearInterval(timerInterval);
+    currentRoomId = null;
+    roomState = null;
+    showScreen(homeScreen);
+    showErrorMessage('Left lobby.');
 });
 
-leaveGameButton.addEventListener('click', async () => {
+leaveGameButton.addEventListener('click', () => {
     if (!currentRoomId) return;
-    try {
-        const result = await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
-        clearInterval(pollingInterval);
-        clearInterval(timerInterval); // Clear timer
-        currentRoomId = null;
-        roomState = null;
-        showScreen(homeScreen);
-        if (result.message === 'Room deleted.') {
-            showErrorMessage('Game left. Room deleted.');
-        } else {
-            showErrorMessage('Left game successfully.');
-        }
-    } catch (error) {
-        // Error message already handled by apiCall
+    if (!socket.connected) {
+        showErrorMessage('Not connected to server. Please wait or refresh.');
+        return;
     }
+    socket.emit('leaveRoom', { roomId: currentRoomId, userId: currentUserId });
+    clearInterval(timerInterval);
+    currentRoomId = null;
+    roomState = null;
+    showScreen(homeScreen);
+    showErrorMessage('Left game.');
 });
 
 
-// --- Realtime Updates (Polling) ---
-function startRoomPolling(roomId) {
-    clearInterval(pollingInterval); // Clear any existing interval
-    pollingInterval = setInterval(async () => {
-        try {
-            const room = await apiCall(`/api/rooms/${roomId}`);
-            updateUI(room);
-        } catch (error) {
-            console.error("Polling error:", error);
-            // If room not found (e.g., deleted by host), redirect to home
-            if (error.message.includes('Room not found')) {
-                clearInterval(pollingInterval);
-                clearInterval(timerInterval);
-                currentRoomId = null;
-                roomState = null;
-                showScreen(homeScreen);
-                showErrorMessage('The room no longer exists or you were removed.');
-            }
-        }
-    }, 1000); // Poll every 1 second
-}
-
+// --- UI Update Logic (driven by Socket.IO 'roomUpdate' event) ---
 function updateUI(room) {
-    roomState = room; // Update global room state
-
     if (room.status === 'waiting' && homeScreen.classList.contains('hidden')) {
         updateLobbyUI(room);
         showScreen(lobbyScreen);
@@ -289,7 +308,6 @@ function updateUI(room) {
     } else if (room.status === 'finished' && gameOverScreen.classList.contains('hidden')) {
         showScreen(gameOverScreen);
         updateResultsScreen(room);
-        clearInterval(pollingInterval); // Stop polling when game is finished
         clearInterval(timerInterval); // Stop timer
     }
 
@@ -318,7 +336,7 @@ function updateLobbyUI(room) {
 }
 
 // --- Game Logic ---
-startGameBtn.addEventListener('click', async () => {
+startGameBtn.addEventListener('click', () => {
     if (!currentRoomId || !roomState || roomState.hostId !== currentUserId) {
         showErrorMessage('You are not the host or not in a room.');
         return;
@@ -327,14 +345,11 @@ startGameBtn.addEventListener('click', async () => {
         showErrorMessage('Need 2 players to start the game.');
         return;
     }
-    try {
-        const result = await apiCall(`/api/rooms/${currentRoomId}/start`, 'POST');
-        roomState = result.room; // Update local state with the started room
-        showScreen(gameScreen);
-        startGameUI(roomState);
-    } catch (error) {
-        // Error message already handled by apiCall
+    if (!socket.connected) {
+        showErrorMessage('Not connected to server. Please wait or refresh.');
+        return;
     }
+    socket.emit('startGame', { roomId: currentRoomId, userId: currentUserId });
 });
 
 function startGameUI(room) {
@@ -346,7 +361,10 @@ function startGameUI(room) {
     answerInput.addEventListener('input', updateAnswerCount); // Add event listener for live count
     updateAnswerCount(); // Initial count
     updateGameUI(room); // Update initial game state UI
-    startRoundTimer(room.roundStartTime); // Start the timer for the current round
+    // If roundStartTime is updated by server, restart timer
+    if (room.roundStartTime) {
+        startRoundTimer(room.roundStartTime);
+    }
 }
 
 function updateGameUI(room) {
@@ -354,25 +372,41 @@ function updateGameUI(room) {
     questionText.textContent = room.currentQuestion ? room.currentQuestion.question : 'Loading question...';
 
     // Update scoreboard
-    const player1 = room.players[0];
-    const player2 = room.players[1];
+    // Find players and update dynamically
+    const playersInOrder = room.players.sort((a,b) => {
+        if (a.id === currentUserId) return -1; // Current user first
+        if (b.id === currentUserId) return 1;
+        return 0; // Maintain existing order for others
+    });
 
-    if (player1) {
-        player1NameGame.textContent = `${player1.username} ${player1.id === currentUserId ? '(You)' : ''}`;
-        player1ScoreGame.textContent = player1.score;
-        player1AnswerStatus.textContent = player1.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
-        player1AnswerStatus.className = player1.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
+    const p1 = playersInOrder[0];
+    const p2 = playersInOrder[1];
+
+    if (p1) {
+        player1NameGame.textContent = `${p1.username} ${p1.id === currentUserId ? '(You)' : ''}`;
+        player1ScoreGame.textContent = p1.score;
+        player1AnswerStatus.textContent = p1.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
+        player1AnswerStatus.className = p1.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
+    } else { // Hide if less than 1 player
+        player1NameGame.textContent = '';
+        player1ScoreGame.textContent = '0';
+        player1AnswerStatus.textContent = '';
     }
-    if (player2) {
-        player2NameGame.textContent = `${player2.username} ${player2.id === currentUserId ? '(You)' : ''}`;
-        player2ScoreGame.textContent = player2.score;
-        player2AnswerStatus.textContent = player2.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
-        player2AnswerStatus.className = player2.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
+    
+    if (p2) {
+        player2NameGame.textContent = `${p2.username} ${p2.id === currentUserId ? '(Opponent)' : ''}`;
+        player2ScoreGame.textContent = p2.score;
+        player2AnswerStatus.textContent = p2.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
+        player2AnswerStatus.className = p2.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
+    } else { // Hide if less than 2 players
+        player2NameGame.textContent = '';
+        player2ScoreGame.textContent = '0';
+        player2AnswerStatus.textContent = '';
     }
 
     // Host specific UI for next question button
     const allPlayersAnswered = room.players.every(p => p.hasAnsweredCurrentRound);
-    const roundEnded = (Date.now() - room.roundStartTime) >= 15000; // Check if 15 seconds passed
+    const roundEnded = (Date.now() - room.roundStartTime) >= 15000; // Check if 15 seconds passed based on server time
 
     if (room.hostId === currentUserId && (allPlayersAnswered || roundEnded)) {
         nextQuestionBtn.classList.remove('hidden');
@@ -389,12 +423,20 @@ function updateGameUI(room) {
         answerInput.disabled = false;
         submitAnswerBtn.disabled = false;
     }
+
+    // Restart timer if round has advanced
+    if (room.status === 'playing' && room.roundStartTime && (Date.now() - room.roundStartTime) < 15000) {
+        startRoundTimer(room.roundStartTime);
+    } else if (room.status === 'playing' && (Date.now() - room.roundStartTime) >= 15000) {
+        // If time has run out, ensure timer shows 0
+        clearInterval(timerInterval);
+        timerDisplay.textContent = '0';
+    }
 }
 
 function startRoundTimer(startTime) {
     clearInterval(timerInterval);
     const roundDuration = 15; // seconds
-    countdownTime = roundDuration; // Reset countdown for new round
 
     timerInterval = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
@@ -405,8 +447,6 @@ function startRoundTimer(startTime) {
         if (countdownTime <= 0) {
             clearInterval(timerInterval);
             timerDisplay.textContent = '0';
-            // Optionally, automatically submit or disable input here if time runs out
-            // For now, the backend will determine round end based on its timer or all answers received.
             answerInput.disabled = true;
             submitAnswerBtn.disabled = true;
         }
@@ -419,9 +459,13 @@ function updateAnswerCount() {
     answerCountDisplay.textContent = `${answers.length}/8 items entered`;
 }
 
-submitAnswerBtn.addEventListener('click', async () => {
+submitAnswerBtn.addEventListener('click', () => {
     if (!currentRoomId || !roomState) {
         showErrorMessage('Not in a game room.');
+        return;
+    }
+    if (!socket.connected) {
+        showErrorMessage('Not connected to server. Please wait or refresh.');
         return;
     }
     const answers = parseAnswers(answerInput.value);
@@ -429,48 +473,30 @@ submitAnswerBtn.addEventListener('click', async () => {
         showErrorMessage('Please enter at least one answer.');
         return;
     }
-    // Note: The backend expects an array of 8. We send what the user enters, up to 8.
-    // Backend will handle scoring based on matches.
-    try {
-        const result = await apiCall(`/api/rooms/${currentRoomId}/answer`, 'POST', {
-            round: roomState.currentRound, // Pass current round
-            answers: answers // This sends an ARRAY
-        });
-        // Update local room state immediately with received score
-        roomState = result.room;
-        const player = roomState.players.find(p => p.id === currentUserId);
-        if (player) {
-            player.score = result.scoreEarned; // Update own score for current round
-        }
-        answerInput.disabled = true;
-        submitAnswerBtn.disabled = true;
-        updateGameUI(roomState); // Re-render UI based on updated room state
-        showErrorMessage(`Submitted! You earned ${result.scoreEarned} points this round.`);
-
-    } catch (error) {
-        // Error handled by apiCall
-    }
+    // Emit submitAnswer event to backend
+    socket.emit('submitAnswer', {
+        roomId: currentRoomId,
+        userId: currentUserId,
+        round: roomState.currentRound,
+        answers: answers
+    });
+    // UI will be updated by 'roomUpdate' event from server
+    answerInput.disabled = true;
+    submitAnswerBtn.disabled = true;
+    showErrorMessage('Answers submitted, waiting for opponent/round end.');
 });
 
-nextQuestionBtn.addEventListener('click', async () => {
+nextQuestionBtn.addEventListener('click', () => {
     if (!currentRoomId || !roomState || roomState.hostId !== currentUserId) {
         showErrorMessage('You are not the host or not in a room.');
         return;
     }
-    try {
-        const result = await apiCall(`/api/rooms/${currentRoomId}/next-round`, 'POST');
-        if (result.room.status === 'finished') {
-            showScreen(gameOverScreen);
-            updateResultsScreen(result.room);
-            clearInterval(pollingInterval);
-            clearInterval(timerInterval);
-        } else {
-            roomState = result.room; // Update local state
-            startGameUI(roomState); // Re-initialize game UI for next round
-        }
-    } catch (error) {
-        // Error handled by apiCall
+    if (!socket.connected) {
+        showErrorMessage('Not connected to server. Please wait or refresh.');
+        return;
     }
+    socket.emit('nextRound', { roomId: currentRoomId, userId: currentUserId });
+    // UI will be updated by 'roomUpdate' event from server
 });
 
 
@@ -509,8 +535,8 @@ playAgainButton.addEventListener('click', () => {
     // Reset state for a new game
     currentRoomId = null;
     roomState = null;
-    clearInterval(pollingInterval);
     clearInterval(timerInterval);
+    // Don't disconnect socket, just prepare for new game
     initializeUser(); // Go back to home screen
 });
 
@@ -518,8 +544,8 @@ returnToHomeButton.addEventListener('click', () => {
     // Reset state and go home
     currentRoomId = null;
     roomState = null;
-    clearInterval(pollingInterval);
     clearInterval(timerInterval);
+    // Don't disconnect socket, just prepare for new game
     initializeUser(); // Go back to home screen
 });
 
