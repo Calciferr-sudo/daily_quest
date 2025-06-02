@@ -13,6 +13,7 @@
     --success-color: #48bb78; /* Green */
     --warning-color: #fb7185; /* Rose */
     --info-color: #818cf8; /* Light Indigo for room ID */
+    --accent-purple: #9f7aea;
 }
 
 body {
@@ -27,37 +28,41 @@ body {
     padding: 20px;
     box-sizing: border-box;
     line-height: 1.6;
-    background-image: linear-gradient(to bottom right, #1a202c, #2d3748); /* Subtle gradient */
+    background-image: linear-gradient(to bottom right, #1a202c, #2d3748);
+    background-attachment: fixed; /* Keep background fixed during scroll */
 }
 
 .container {
     background-color: var(--bg-medium);
     padding: 40px;
     border-radius: 16px;
-    box-shadow: 0 15px 25px rgba(0, 0, 0, 0.3); /* Stronger shadow */
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4); /* Stronger, softer shadow */
     width: 100%;
-    max-width: 650px; /* Slightly wider max-width */
+    max-width: 700px; /* Wider max-width for better content display */
     text-align: center;
-    border: 1px solid rgba(255, 255, 255, 0.05); /* Subtle border */
+    border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle border */
+    position: relative; /* For potential future absolute positioning */
+    overflow: hidden; /* Ensure rounded corners clip content */
 }
 
 h1 {
-    font-size: 3rem; /* Larger heading */
+    font-size: 3.5rem; /* Even larger heading */
     color: var(--primary-color);
     margin-bottom: 30px;
     font-weight: 700;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1.5px;
 }
 
 h2 {
-    font-size: 2.2rem;
-    color: #9f7aea; /* Purple accent */
+    font-size: 2.5rem;
+    color: var(--accent-purple);
     margin-bottom: 25px;
     font-weight: 600;
 }
 
 h3 {
-    font-size: 1.6rem;
+    font-size: 1.8rem;
     color: var(--text-medium);
     margin-bottom: 20px;
     font-weight: 500;
@@ -79,8 +84,8 @@ h3 {
     width: 100%;
     padding: 14px;
     border: 1px solid var(--bg-light);
-    border-radius: 10px; /* Slightly more rounded */
-    background-color: var(--bg-dark); /* Darker background for input */
+    border-radius: 10px;
+    background-color: var(--bg-dark);
     color: var(--text-light);
     font-size: 1.1rem;
     box-sizing: border-box;
@@ -90,7 +95,7 @@ h3 {
 .input-field:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.4); /* Focus ring */
+    box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.5); /* More prominent focus ring */
 }
 
 .btn {
@@ -100,14 +105,36 @@ h3 {
     font-size: 1.2rem;
     font-weight: 600;
     cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.15s ease, box-shadow 0.3s ease;
+    transition: all 0.2s ease-in-out; /* All for smoother transitions */
     display: inline-block;
     letter-spacing: 0.5px;
+    position: relative;
+    overflow: hidden; /* For button effects */
+    z-index: 1;
+}
+
+.btn:before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s ease-in-out, height 0.3s ease-in-out;
+    z-index: -1;
+}
+
+.btn:hover:before {
+    width: 200%;
+    height: 200%;
 }
 
 .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
 .btn:active {
@@ -116,32 +143,33 @@ h3 {
 }
 
 .btn-primary {
-    background-color: var(--primary-color);
+    background: linear-gradient(45deg, var(--primary-color), #7f9cf5); /* Gradient */
     color: white;
 }
 
 .btn-primary:hover {
-    background-color: var(--primary-hover);
+    background: linear-gradient(45deg, #5a67d8, #6b82f5);
 }
 
 .btn-secondary {
-    background-color: var(--secondary-color);
+    background: linear-gradient(45deg, var(--secondary-color), #5a67d8); /* Gradient */
     color: var(--text-light);
 }
 
 .btn-secondary:hover {
-    background-color: var(--secondary-hover);
+    background: linear-gradient(45deg, #3b4250, #4a5568);
 }
 
 .btn-danger {
-    background-color: var(--danger-color);
+    background: linear-gradient(45deg, var(--danger-color), #f687b3); /* Gradient */
     color: white;
 }
 
 .btn-danger:hover {
-    background-color: var(--danger-hover);
+    background: linear-gradient(45deg, #c53030, #e53e3e);
 }
 
+/* Tailwind-like utility classes for spacing and layout */
 .w-full { width: 100%; }
 .mt-4 { margin-top: 1rem; }
 .mt-6 { margin-top: 1.5rem; }
@@ -165,13 +193,13 @@ h3 {
 .font-semibold { font-weight: 600; }
 .font-medium { font-weight: 500; }
 
-/* Colors defined in root variables now */
+/* Colors mapped to variables */
 .text-rose-500 { color: var(--danger-color); }
-.text-teal-600 { color: #0d9488; } /* Specific teal */
+.text-teal-600 { color: #0d9488; }
 .text-slate-700 { color: #334155; }
 .text-slate-400 { color: #94a3b8; }
 .text-indigo-400 { color: var(--info-color); }
-.text-purple-400 { color: #c084fc; }
+.text-purple-400 { color: var(--accent-purple); }
 .text-teal-400 { color: #2dd4bf; }
 .text-rose-400 { color: var(--warning-color); }
 .text-green-400 { color: var(--success-color); }
@@ -180,7 +208,7 @@ h3 {
 
 
 .card {
-    background-color: var(--bg-light); /* Lighter background for cards */
+    background-color: var(--bg-light);
     padding: 2.5rem;
     border-radius: 12px;
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
@@ -194,7 +222,7 @@ h3 {
 }
 
 .screen {
-    animation: fadeIn 0.6s ease-out; /* Slightly longer fade-in */
+    animation: fadeIn 0.6s ease-out;
 }
 
 @keyframes fadeIn {
@@ -203,7 +231,7 @@ h3 {
 }
 
 .divider {
-    border-top: 1px dashed var(--bg-light); /* Dashed line */
+    border-top: 1px dashed var(--bg-light);
     margin: 35px 0;
     text-align: center;
     line-height: 0.1em;
@@ -233,6 +261,7 @@ ul {
     text-align: center;
     font-weight: 500;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    animation: slideInTop 0.4s ease-out;
 }
 
 /* Notification Banner */
@@ -245,111 +274,146 @@ ul {
     text-align: center;
     font-weight: 500;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    animation: slideInTop 0.4s ease-out;
+}
+
+@keyframes slideInTop {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* Specific styles for Lobby */
+#player-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 #player-list li {
-    background-color: var(--bg-dark); /* Darker background for list items */
+    background-color: var(--bg-dark);
     padding: 12px;
     border-radius: 8px;
     text-align: center;
     font-size: 1.1rem;
     font-weight: 500;
     border: 1px solid rgba(255, 255, 255, 0.05);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 /* Game Screen Styles */
+.game-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    padding: 0 10px; /* Some padding for header elements */
+}
+
 #question-text {
-    min-height: 80px; /* Ensure consistent height for question area */
+    min-height: 100px; /* More space for questions */
     display: flex;
     align-items: center;
     justify-content: center;
+    padding: 10px; /* Inner padding for text */
 }
 
 .options-grid {
     display: grid;
     gap: 15px;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); /* Better min-width for options */
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Larger min-width for options */
 }
 
 .options-grid-item {
-    padding: 15px 20px;
+    padding: 18px 20px; /* More padding for touch targets */
     background-color: var(--primary-color);
     color: white;
     border-radius: 10px;
     text-align: center;
-    font-size: 1.1rem;
+    font-size: 1.15rem; /* Slightly larger font */
     font-weight: 500;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease, border 0.2s ease;
+    transition: all 0.2s ease-in-out;
     border: 2px solid transparent;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
 .options-grid-item:hover:not(:disabled) {
     background-color: var(--primary-hover);
-    transform: translateY(-1px);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
 }
 
 .option-button.selected {
-    background-color: var(--secondary-color); /* Highlight player's chosen answer */
+    background-color: var(--secondary-color);
     border: 2px solid var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.6); /* Stronger selection highlight */
 }
 
 .option-button.correct {
     background-color: var(--success-color);
     border: 2px solid #38a169;
+    box-shadow: 0 0 0 3px rgba(72, 187, 120, 0.6);
 }
 
 .option-button.incorrect {
     background-color: var(--danger-color);
     border: 2px solid #c53030;
+    box-shadow: 0 0 0 3px rgba(229, 62, 62, 0.6);
 }
 
 .options-grid-item:disabled {
     opacity: 0.6;
     cursor: not-allowed;
-    background-color: var(--bg-light); /* Grey out disabled buttons */
+    background-color: var(--bg-light);
     color: var(--text-medium);
+    box-shadow: none;
 }
 
 .scoreboard {
     display: flex;
     justify-content: space-around;
-    gap: 20px;
-    margin-top: 25px;
+    gap: 25px; /* More gap */
+    margin-top: 30px;
 }
 
 .scoreboard-card {
     flex: 1;
-    background-color: var(--bg-dark); /* Darker background for scoreboard cards */
-    padding: 18px;
+    background-color: var(--bg-dark);
+    padding: 20px;
     border-radius: 12px;
     text-align: center;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.15);
 }
 
 .scoreboard-card .player-name {
-    font-size: 1.25rem;
+    font-size: 1.3rem;
     font-weight: 600;
     color: var(--text-light);
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .scoreboard-card .player-score {
-    font-size: 1.8rem;
+    font-size: 2rem;
     font-weight: bold;
     color: var(--success-color);
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .scoreboard-card .player-status {
-    font-size: 0.95rem;
-    margin-top: 5px;
+    font-size: 1rem;
+    margin-top: 8px;
     font-style: italic;
     color: var(--text-medium);
 }
 
 /* Game Over Screen */
+#finalScoresList {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
 #finalScoresList li {
     background-color: var(--bg-dark);
     padding: 15px;
@@ -357,9 +421,10 @@ ul {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-size: 1.15rem;
+    font-size: 1.2rem;
     font-weight: 500;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 
@@ -367,27 +432,32 @@ ul {
 
 @media (max-width: 768px) {
     .container {
-        padding: 25px;
+        padding: 30px;
+        border-radius: 14px;
     }
 
     h1 {
-        font-size: 2.5rem;
-        margin-bottom: 20px;
+        font-size: 2.8rem;
+        margin-bottom: 25px;
     }
 
     h2 {
-        font-size: 1.8rem;
+        font-size: 2rem;
         margin-bottom: 20px;
     }
 
     h3 {
-        font-size: 1.4rem;
+        font-size: 1.5rem;
         margin-bottom: 15px;
     }
 
     .label, .input-field, .btn, .options-grid-item {
         font-size: 1rem;
         padding: 12px;
+    }
+
+    .btn {
+        padding: 12px 25px;
     }
 
     .options-grid {
@@ -411,6 +481,12 @@ ul {
     .scoreboard-card .player-score {
         font-size: 1.4rem;
     }
+
+    .game-header {
+        flex-direction: column;
+        align-items: center;
+        gap: 10px;
+    }
 }
 
 @media (max-width: 480px) {
@@ -424,23 +500,23 @@ ul {
     }
 
     h1 {
-        font-size: 2rem;
+        font-size: 2.2rem;
         margin-bottom: 15px;
     }
 
     h2 {
-        font-size: 1.5rem;
+        font-size: 1.7rem;
         margin-bottom: 15px;
     }
 
     h3 {
-        font-size: 1.2rem;
+        font-size: 1.3rem;
         margin-bottom: 10px;
     }
 
     .btn {
         padding: 10px 20px;
-        font-size: 1rem;
+        font-size: 0.95rem;
         border-radius: 8px;
     }
 
@@ -451,11 +527,19 @@ ul {
 
     .error-banner, .notification-banner {
         padding: 10px;
-        font-size: 0.9rem;
+        font-size: 0.85rem;
     }
 
     .options-grid-item {
         padding: 12px;
+        font-size: 0.95rem;
+    }
+
+    .scoreboard-card .player-name {
         font-size: 1rem;
+    }
+
+    .scoreboard-card .player-score {
+        font-size: 1.2rem;
     }
 }

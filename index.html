@@ -21,7 +21,7 @@
                 <label for="username-input" class="label">Enter Your Username:</label>
                 <input type="text" id="username-input" placeholder="e.g., QuizMaster" class="input-field">
             </div>
-            <button id="save-username-btn" class="btn btn-primary w-full mt-4">Save Username & Continue</button>
+            <button id="save-username-btn" class="btn btn-primary w-full mt-4">Save Username</button>
 
             <div class="divider">OR</div>
 
@@ -62,7 +62,7 @@
         </div>
 
         <div id="game-screen" class="screen hidden">
-            <div class="flex justify-between items-center mb-6">
+            <div class="game-header">
                 <p id="question-counter" class="text-xl font-semibold text-teal-400">Question 0 of 5</p>
                 <p id="timer" class="text-2xl font-bold text-rose-400">Time Left: 15s</p>
             </div>
@@ -81,7 +81,7 @@
                     <p id="player1AnswerStatus" class="player-status">Thinking...</p>
                 </div>
                 <div class="scoreboard-card">
-                    <p id="player2NameGame" class="player2-name">Player 2</p>
+                    <p id="player2NameGame" class="player-name">Player 2</p>
                     <p class="player-score">Score: <span id="player2ScoreGame">0</span></p>
                     <p id="player2AnswerStatus" class="player-status">Thinking...</p>
                 </div>
