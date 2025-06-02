@@ -41,7 +41,7 @@ let selectedOptionForCurrentQuestion = null; // To highlight user's chosen answe
 
 // --- Server API Base URL ---
 // IMPORTANT: Replace with your Render.com backend URL after deployment
-const API_BASE_URL = 'http://localhost:3000'; // Change to your Render.com URL in production
+const API_BASE_URL = 'https://quiz-backend-bs3b.onrender.com'; // Change to your Render.com URL in production
 
 // --- Utility Functions ---
 function showScreen(screenElement) {
