@@ -1,0 +1,310 @@
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: #1a202c; /* Dark gray */
+    color: #edf2f7; /* Light text */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.container {
+    background-color: #2d3748; /* Slightly lighter dark gray */
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 10px 15px rgba(0, 0, 0, 0.2);
+    width: 100%;
+    max-width: 600px;
+    text-align: center;
+}
+
+h1 {
+    font-size: 2.5rem;
+    color: #667eea; /* Indigo */
+    margin-bottom: 25px;
+    font-weight: bold;
+}
+
+h2 {
+    font-size: 2rem;
+    color: #9f7aea; /* Purple */
+    margin-bottom: 20px;
+}
+
+h3 {
+    font-size: 1.5rem;
+    color: #e2e8f0; /* Light gray */
+    margin-bottom: 15px;
+}
+
+.screen {
+    display: none;
+    animation: fadeIn 0.5s ease-out;
+}
+
+.screen.active {
+    display: block;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.input-group {
+    margin-bottom: 20px;
+    text-align: left;
+}
+
+.input-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #a0aec0; /* Gray */
+}
+
+input[type="text"],
+select {
+    width: calc(100% - 22px); /* Adjust for padding/border */
+    padding: 12px;
+    border: 1px solid #4a5568; /* Darker border */
+    border-radius: 8px;
+    background-color: #4a5568; /* Darker input background */
+    color: #edf2f7;
+    font-size: 1rem;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease-in-out;
+}
+
+input[type="text"]:focus,
+select:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 118, 234, 0.4);
+}
+
+button {
+    background-color: #48bb78; /* Green */
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+    margin-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+button:hover {
+    background-color: #38a169; /* Darker green */
+    transform: translateY(-2px);
+}
+
+button:disabled {
+    background-color: #a0aec0; /* Grayed out */
+    cursor: not-allowed;
+    transform: none;
+}
+
+.input-group button {
+    width: auto; /* For the "Save" button next to username */
+    margin-left: 10px;
+    padding: 8px 15px;
+    font-size: 0.9rem;
+    background-color: #667eea;
+}
+.input-group button:hover {
+    background-color: #5a67d8;
+}
+
+#create-room-btn {
+    background-color: #4299e1; /* Blue */
+}
+#create-room-btn:hover {
+    background-color: #3182ce;
+}
+
+#join-room-btn {
+    background-color: #ed8936; /* Orange */
+}
+#join-room-btn:hover {
+    background-color: #dd6b20;
+}
+
+#start-game-btn {
+    background-color: #48bb78; /* Green */
+    margin-top: 20px;
+}
+#start-game-btn:hover {
+    background-color: #38a169;
+}
+
+.separator {
+    margin: 30px 0;
+    font-weight: bold;
+    color: #a0aec0;
+    position: relative;
+}
+.separator::before, .separator::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 40%;
+    height: 1px;
+    background-color: #4a5568;
+}
+.separator::before { left: 0; }
+.separator::after { right: 0; }
+
+#player-list, #final-scores {
+    list-style: none;
+    padding: 0;
+    margin: 15px 0 25px;
+}
+
+#player-list li, #final-scores li {
+    background-color: #4a5568;
+    padding: 10px 15px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 1.1rem;
+}
+#player-list li span, #final-scores li span {
+    font-weight: bold;
+    color: #9f7aea;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.error-message {
+    background-color: #e53e3e; /* Red */
+    color: white;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    display: none; /* Controlled by JS */
+}
+
+/* Game Screen Styles */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    font-size: 1.2rem;
+    color: #a0aec0;
+}
+
+#timer {
+    font-weight: bold;
+    color: #f6e05e; /* Yellow */
+    font-size: 1.5rem;
+}
+
+#question-text {
+    font-size: 1.8rem;
+    font-weight: 600;
+    margin-bottom: 30px;
+    color: #edf2f7;
+}
+
+.options-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+.options-grid button {
+    background-color: #4a5568;
+    color: #edf2f7;
+    font-size: 1.2rem;
+    padding: 15px;
+    border-radius: 10px;
+    transition: background-color 0.2s ease-in-out;
+    width: 100%; /* Override default button width */
+}
+
+.options-grid button:not(:disabled):hover {
+    background-color: #667eea; /* Indigo */
+}
+
+/* Specific answer states */
+.option-button.selected {
+    background-color: #667eea; /* Highlight player's chosen answer */
+    border: 2px solid #5a67d8;
+}
+
+.option-button.correct {
+    background-color: #48bb78; /* Green for correct answer */
+    border: 2px solid #38a169;
+}
+
+.option-button.incorrect {
+    background-color: #e53e3e; /* Red for incorrect answer */
+    border: 2px solid #c53030;
+}
+
+.options-grid button:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+    background-color: #4a5568;
+}
+
+.scoreboard {
+    display: flex;
+    justify-content: space-around;
+    gap: 20px;
+}
+
+.scoreboard div {
+    flex: 1;
+    background-color: #4a5568;
+    padding: 15px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.scoreboard h3 {
+    font-size: 1.2rem;
+    margin-bottom: 5px;
+    color: #a0aec0;
+}
+
+.scoreboard p {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #f6ad55; /* Orange-yellow */
+}
+
+#winner-message {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #48bb78; /* Green */
+    margin-top: 30px;
+    margin-bottom: 30px;
+}
+
+#play-again-btn {
+    background-color: #667eea;
+}
+#play-again-btn:hover {
+    background-color: #5a67d8;
+}
+
+/* Responsive adjustments */
+@media (min-width: 768px) {
+    .options-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
