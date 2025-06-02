@@ -46,7 +46,7 @@ let selectedAnswer = null; // To track the user's selected answer
 
 // --- Configuration ---
 const backendUrl = 'https://quiz-backend-4u7t.onrender.com'; // Your Render backend URL
-const ROUND_DURATION_SECONDS = 10; // Must match backend configuration
+const ROUND_DURATION_SECONDS = 15; // IMPORTANT: Must match backend's roundDuration (15 seconds)
 
 
 // --- Screen Management ---
@@ -106,6 +106,7 @@ async function apiCall(url, method = 'GET', body = null) {
             console.error('API Error:', errorData);
 
             if (response.status === 400) {
+                // For 400 Bad Request, show as notification as it's often user-actionable
                 showNotification(errorData.message || 'Action failed.');
                 return Promise.reject(new Error(errorData.message || 'Bad Request'));
             } else {
@@ -138,7 +139,9 @@ function setupSocket(roomId) {
         // Register user's socket ID with their userId on the backend
         socket.emit('registerUserSocket', currentUserId);
         // Then join the specific room
-        socket.emit('joinRoom', { roomId, userId: currentUserId, username: currentUsername });
+        if (roomId) { // Only join if roomId is known (e.g., joining existing room)
+            socket.emit('joinRoom', { roomId, userId: currentUserId, username: currentUsername });
+        }
     });
 
     socket.on('connect_error', (error) => {
@@ -152,13 +155,17 @@ function setupSocket(roomId) {
             showErrorMessage('Disconnected from server. Room may have been deleted.');
             resetGameAndGoHome();
         } else {
-            showErrorMessage('Lost connection to game server. Attempting to reconnect...');
+            // Only show reconnection attempt message if it's not a user-initiated disconnect
+            if (!['transport close', 'client namespace disconnect'].includes(reason)) {
+                 showErrorMessage('Lost connection to game server. Attempting to reconnect...');
+            }
         }
     });
 
     socket.on('roomState', (room) => {
         console.log('Received roomState update:', room);
         roomState = room;
+        currentRoomId = room.roomId; // Ensure currentRoomId is always updated
 
         if (roomState.status === 'waiting') {
             showScreen(lobbyScreen);
@@ -166,7 +173,7 @@ function setupSocket(roomId) {
         } else if (roomState.status === 'playing') {
             showScreen(gameScreen);
             updateGameScreen(roomState);
-            startClientTimer(roomState.roundStartTime);
+            startClientTimer(roomState.roundStartTime); // Use roundStartTime from backend
         } else if (roomState.status === 'finished') {
             showScreen(gameOverScreen);
             updateResultsScreen(roomState);
@@ -193,6 +200,7 @@ function setupSocket(roomId) {
         } else {
             showNotification("Incorrect answer.");
         }
+        console.log('Answer submitted confirmation received:', data);
     });
 
     socket.on('error', (data) => {
@@ -237,8 +245,8 @@ function updateLobbyScreen(room) {
 
 function updateGameScreen(room) {
     console.log('Updating game screen with room:', room);
-    if (!room.questions || room.questions.length === 0) {
-        console.error("No questions found in room state!");
+    if (!room.questions || room.questions.length === 0 || room.currentQuestionIndex === undefined) {
+        console.error("No questions found or currentQuestionIndex missing in room state!");
         questionText.textContent = "Error: No questions loaded. Please ask the host to restart the game.";
         optionsContainer.innerHTML = '';
         return;
@@ -254,7 +262,7 @@ function updateGameScreen(room) {
         optionsContainer.innerHTML = '';
         selectedAnswer = null; // Reset selected answer for new question
 
-        currentQuestion.answers.forEach(answer => {
+        currentQuestion.options.forEach(answer => { // Use options array, not hardcoded 'answers'
             const button = document.createElement('button');
             button.textContent = answer;
             button.classList.add('btn', 'options-grid-item', 'option-button', 'w-full');
@@ -286,12 +294,13 @@ function updateScoreboard(room) {
     const player2ScoreGame = document.getElementById('player2ScoreGame');
     const player2AnswerStatus = document.getElementById('player2AnswerStatus');
 
+    // Ensure player 1 and 2 exist before accessing
     const player1 = room.players[0];
     const player2 = room.players[1];
 
     if (player1) {
         player1NameGame.textContent = player1.username + (player1.id === currentUserId ? ' (You)' : '');
-        player1ScoreGame.textContent = player1.score;
+        player1ScoreGame.textContent = room.scores[player1.id] !== undefined ? room.scores[player1.id] : 0;
         player1AnswerStatus.textContent = player1.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
         player1AnswerStatus.style.color = player1.hasAnsweredCurrentRound ? '#48bb78' : '#a0aec0';
     } else {
@@ -302,7 +311,7 @@ function updateScoreboard(room) {
 
     if (player2) {
         player2NameGame.textContent = player2.username + (player2.id === currentUserId ? ' (You)' : '');
-        player2ScoreGame.textContent = player2.score;
+        player2ScoreGame.textContent = room.scores[player2.id] !== undefined ? room.scores[player2.id] : 0;
         player2AnswerStatus.textContent = player2.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
         player2AnswerStatus.style.color = player2.hasAnsweredCurrentRound ? '#48bb78' : '#a0aec0';
     } else {
@@ -315,7 +324,14 @@ function updateScoreboard(room) {
 
 function updateResultsScreen(room) {
     finalScoresList.innerHTML = '';
-    const sortedPlayers = room.players.sort((a, b) => b.score - a.score);
+    // Sort players by score from backend's 'scores' object
+    const sortedPlayers = Object.keys(room.scores)
+        .map(id => ({
+            id: id,
+            username: room.players.find(p => p.id === id)?.username || `Unknown User (${id.substring(0, 4)})`,
+            score: room.scores[id]
+        }))
+        .sort((a, b) => b.score - a.score);
 
     sortedPlayers.forEach(player => {
         const li = document.createElement('li');
@@ -349,8 +365,6 @@ function selectAnswer(answer) {
     selectedAnswer = answer;
     Array.from(optionsContainer.children).forEach(button => {
         button.classList.remove('selected');
-        // Do not disable all buttons here immediately, only the selected one
-        // The backend will send roomState update which will then disable all
         if (button.textContent === answer) {
             button.classList.add('selected');
         }
@@ -381,31 +395,34 @@ function highlightSelectedAnswer(answer) {
     });
 }
 
-
+// *** IMPORTANT FIX: Use API Call for Answer Submission ***
 async function submitAnswer(answer) {
-    if (!currentRoomId || !currentUserId || !answer) {
-        console.error("Cannot submit answer: Missing room ID, user ID, or answer.");
-        showErrorMessage("Could not submit answer. Please try again.");
+    if (!currentRoomId || !currentUserId || !answer || roomState.currentQuestionIndex === undefined) {
+        console.error("Cannot submit answer: Missing room ID, user ID, answer, or current question index.");
+        showErrorMessage("Could not submit answer. Missing game data.");
         return;
     }
     try {
-        // Emit answer via Socket.IO
-        socket.emit('submitAnswer', {
-            roomId: currentRoomId,
+        await apiCall(`/api/rooms/${currentRoomId}/answer`, 'POST', {
             userId: currentUserId,
-            round: roomState.currentRound,
-            answer: answer // Send the single selected answer
+            round: roomState.currentQuestionIndex, // Send current question index as 'round'
+            answer: answer
         });
-        console.log('Answer submission sent via socket.');
+        console.log('Answer submission sent via API.');
+        // Backend will send roomState update upon successful submission.
+        // The 'answerSubmittedConfirmation' event will also be received via socket.
     } catch (error) {
-        console.error("Error submitting answer:", error.message);
+        console.error("Error submitting answer via API:", error.message);
+        showErrorMessage("Failed to submit answer: " + error.message);
+        enableAnswerOptions(); // Re-enable options if submission fails
     }
 }
 
 function startClientTimer(roundStartTime) {
     clearInterval(timerInterval);
     const countdownElement = timerDisplay;
-    const endTime = roundStartTime + (ROUND_DURATION_SECONDS * 1000); // Calculate end time based on backend start time
+    // Calculate end time based on backend's start time and consistent duration
+    const endTime = roundStartTime + (ROUND_DURATION_SECONDS * 1000);
 
     const updateTimer = () => {
         const now = Date.now();
@@ -417,7 +434,6 @@ function startClientTimer(roundStartTime) {
             clearInterval(timerInterval);
             countdownElement.textContent = 'Time Up!';
             disableAnswerOptions();
-            // No need to explicitly call nextRound from frontend, backend timer handles it
         }
     };
 
@@ -466,8 +482,8 @@ createRoomBtn.addEventListener('click', async () => {
     }
     const difficulty = difficultySelect.value;
     try {
-        // Emit createRoom event via socket
-        setupSocket(null); // Initialize socket first (roomId will be assigned by backend)
+        // Initialize socket first, then emit createRoom
+        setupSocket(null); // No room ID yet, will be assigned by backend
         socket.emit('createRoom', { userId: currentUserId, username: currentUsername, difficulty });
         // The roomCreated event from socket will handle setting currentRoomId and showing notification
     } catch (error) {
@@ -486,8 +502,8 @@ joinRoomBtn.addEventListener('click', async () => {
         return;
     }
     try {
-        // Emit joinRoom event via socket
-        setupSocket(enteredRoomId.toUpperCase()); // Initialize socket with known roomId
+        // Initialize socket with known roomId, then socket.on('connect') will emit joinRoom
+        setupSocket(enteredRoomId.toUpperCase());
         // The roomState event from socket will handle showing the lobby screen
     } catch (error) {
         console.error('Error joining room:', error.message);
