@@ -46,7 +46,7 @@ const returnToHomeButton = document.getElementById('returnToHomeButton');
 
 
 // --- Game State Variables ---
-const BACKEND_URL = 'http://localhost:3000'; // Make sure this matches your backend URL
+const BACKEND_URL = 'https://quiz-backend-bs3b.onrender.com'; // Make sure this matches your backend URL
 let currentUserId = localStorage.getItem('userId');
 let currentUsername = localStorage.getItem('username');
 let currentRoomId = null;
