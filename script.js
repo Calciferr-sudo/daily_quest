@@ -29,7 +29,7 @@ const optionsContainer = document.getElementById('options-container');
 const leaveGameButton = document.getElementById('leaveGameButton');
 
 // Game Over Screen Elements
-const finalScoresList = document.getElementById('finalScoresList'); // Corrected ID usage
+const finalScoresList = document.getElementById('finalScoresList');
 const winnerInfo = document.getElementById('winnerInfo');
 const playAgainButton = document.getElementById('playAgainButton');
 const returnToHomeButton = document.getElementById('returnToHomeButton');
@@ -41,11 +41,12 @@ let currentUsername = localStorage.getItem('username');
 let currentRoomId = null;
 let roomState = null; // Stores the latest room state from the backend
 let socket = null; // Socket.IO client instance
-let timerInterval = null; // For the game timer
+let timerInterval = null; // For the client-side game timer
 let selectedAnswer = null; // To track the user's selected answer
 
 // --- Configuration ---
 const backendUrl = 'https://quiz-backend-4u7t.onrender.com'; // Your Render backend URL
+const ROUND_DURATION_SECONDS = 10; // Must match backend configuration
 
 
 // --- Screen Management ---
@@ -62,7 +63,6 @@ function showErrorMessage(message) {
     if (errorMessageDisplay) {
         errorMessageDisplay.textContent = message;
         errorMessageDisplay.classList.remove('hidden');
-        // Hide notification message if an error comes up
         if (notificationMessageDisplay && !notificationMessageDisplay.classList.contains('hidden')) {
             notificationMessageDisplay.classList.add('hidden');
         }
@@ -77,7 +77,6 @@ function showNotification(message) {
     if (notificationMessageDisplay) {
         notificationMessageDisplay.textContent = message;
         notificationMessageDisplay.classList.remove('hidden');
-        // Hide error message if a notification comes up
         if (errorMessageDisplay && !errorMessageDisplay.classList.contains('hidden')) {
             errorMessageDisplay.classList.add('hidden');
         }
@@ -93,8 +92,8 @@ async function apiCall(url, method = 'GET', body = null) {
     try {
         const headers = {
             'Content-Type': 'application/json',
-            'X-User-Id': currentUserId, // Include user ID in headers
-            'X-Username': currentUsername // Include username in headers
+            'X-User-Id': currentUserId,
+            'X-Username': currentUsername
         };
         const response = await fetch(backendUrl + url, {
             method: method,
@@ -125,9 +124,8 @@ async function apiCall(url, method = 'GET', body = null) {
 // --- Socket.IO Setup ---
 function setupSocket(roomId) {
     if (socket) {
-        socket.disconnect(); // Disconnect existing socket if any
+        socket.disconnect();
     }
-    // Connect to your backend's Socket.IO server
     socket = io(backendUrl, {
         reconnection: true,
         reconnectionAttempts: 5,
@@ -137,7 +135,10 @@ function setupSocket(roomId) {
 
     socket.on('connect', () => {
         console.log('Socket.IO connected:', socket.id);
-        socket.emit('joinRoomSocket', { roomId, userId: currentUserId });
+        // Register user's socket ID with their userId on the backend
+        socket.emit('registerUserSocket', currentUserId);
+        // Then join the specific room
+        socket.emit('joinRoom', { roomId, userId: currentUserId, username: currentUsername });
     });
 
     socket.on('connect_error', (error) => {
@@ -159,7 +160,6 @@ function setupSocket(roomId) {
         console.log('Received roomState update:', room);
         roomState = room;
 
-        // Update UI based on room status
         if (roomState.status === 'waiting') {
             showScreen(lobbyScreen);
             updateLobbyScreen(roomState);
@@ -174,15 +174,39 @@ function setupSocket(roomId) {
         }
     });
 
+    socket.on('roomCreated', (data) => {
+        currentRoomId = data.roomId;
+        showNotification(`Room ${currentRoomId} created! Waiting for players...`);
+        // The roomState event will handle showing the lobby screen
+    });
+
     socket.on('roomDeleted', (data) => {
         console.warn('Room deleted:', data.message);
         showErrorMessage(data.message || 'The room you were in has been deleted.');
         resetGameAndGoHome();
     });
 
+    socket.on('answerSubmittedConfirmation', (data) => {
+        // Optional: Provide immediate feedback to the player
+        if (data.scoreEarned > 0) {
+            showNotification(`Correct! You earned ${data.scoreEarned} point(s).`);
+        } else {
+            showNotification("Incorrect answer.");
+        }
+    });
+
     socket.on('error', (data) => {
         console.error('Socket error event:', data);
         showErrorMessage(data.message || 'An unexpected socket error occurred.');
+    });
+
+    socket.on('forceAuth', (message) => {
+        showErrorMessage(message || 'Authentication required. Please re-enter your username.');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('username');
+        currentUserId = null;
+        currentUsername = null;
+        resetGameAndGoHome();
     });
 }
 
@@ -241,7 +265,7 @@ function updateGameScreen(room) {
         const player = room.players.find(p => p.id === currentUserId);
         if (player && player.hasAnsweredCurrentRound) {
             disableAnswerOptions();
-            highlightSelectedAnswer(room.answersReceived[currentUserId]);
+            highlightSelectedAnswer(room.answersReceived[currentUserId]?.answer); // Use the stored answer
         } else {
             enableAnswerOptions();
         }
@@ -325,11 +349,14 @@ function selectAnswer(answer) {
     selectedAnswer = answer;
     Array.from(optionsContainer.children).forEach(button => {
         button.classList.remove('selected');
-        button.disabled = true;
+        // Do not disable all buttons here immediately, only the selected one
+        // The backend will send roomState update which will then disable all
         if (button.textContent === answer) {
             button.classList.add('selected');
         }
     });
+    // Disable all options immediately after selection to prevent multiple submissions
+    disableAnswerOptions();
     submitAnswer(answer);
 }
 
@@ -362,16 +389,23 @@ async function submitAnswer(answer) {
         return;
     }
     try {
-        const response = await apiCall(`/api/rooms/${currentRoomId}/answer`, 'POST', { answer });
-        console.log('Answer submission response:', response);
+        // Emit answer via Socket.IO
+        socket.emit('submitAnswer', {
+            roomId: currentRoomId,
+            userId: currentUserId,
+            round: roomState.currentRound,
+            answer: answer // Send the single selected answer
+        });
+        console.log('Answer submission sent via socket.');
     } catch (error) {
         console.error("Error submitting answer:", error.message);
     }
 }
 
-function startClientTimer(endTime) {
+function startClientTimer(roundStartTime) {
     clearInterval(timerInterval);
     const countdownElement = timerDisplay;
+    const endTime = roundStartTime + (ROUND_DURATION_SECONDS * 1000); // Calculate end time based on backend start time
 
     const updateTimer = () => {
         const now = Date.now();
@@ -383,6 +417,7 @@ function startClientTimer(endTime) {
             clearInterval(timerInterval);
             countdownElement.textContent = 'Time Up!';
             disableAnswerOptions();
+            // No need to explicitly call nextRound from frontend, backend timer handles it
         }
     };
 
@@ -396,9 +431,9 @@ function resetGameAndGoHome() {
     roomState = null;
     if (socket) {
         socket.disconnect();
-        socket = null; // Clear the socket instance
+        socket = null;
     }
-    initializeUser(); // Go back to home screen
+    initializeUser();
 }
 
 
@@ -414,7 +449,7 @@ saveUsernameBtn.addEventListener('click', async () => {
             currentUsername = data.username;
             localStorage.setItem('userId', currentUserId);
             localStorage.setItem('username', currentUsername);
-            showNotification(`Username saved: ${currentUsername}!`);
+            showNotification(`Username saved: ${currentUsername}! You can now create or join a room.`);
             // No screen change here, user remains on home screen to choose next action
         } catch (error) {
             console.error('Authentication error:', error.message);
@@ -431,10 +466,10 @@ createRoomBtn.addEventListener('click', async () => {
     }
     const difficulty = difficultySelect.value;
     try {
-        const response = await apiCall('/api/rooms', 'POST', { difficulty });
-        currentRoomId = response.roomId;
-        setupSocket(currentRoomId);
-        showNotification(`Room ${currentRoomId} created! Waiting for players...`);
+        // Emit createRoom event via socket
+        setupSocket(null); // Initialize socket first (roomId will be assigned by backend)
+        socket.emit('createRoom', { userId: currentUserId, username: currentUsername, difficulty });
+        // The roomCreated event from socket will handle setting currentRoomId and showing notification
     } catch (error) {
         console.error('Error creating room:', error.message);
     }
@@ -451,10 +486,9 @@ joinRoomBtn.addEventListener('click', async () => {
         return;
     }
     try {
-        const response = await apiCall('/api/rooms/join', 'POST', { roomId: enteredRoomId });
-        currentRoomId = response.roomId;
-        setupSocket(currentRoomId);
-        showNotification(`Joined room ${currentRoomId}!`);
+        // Emit joinRoom event via socket
+        setupSocket(enteredRoomId.toUpperCase()); // Initialize socket with known roomId
+        // The roomState event from socket will handle showing the lobby screen
     } catch (error) {
         console.error('Error joining room:', error.message);
     }
@@ -466,27 +500,20 @@ startGameBtn.addEventListener('click', async () => {
         showErrorMessage("You must be in a room to start the game.");
         return;
     }
-    try {
-        const response = await apiCall(`/api/rooms/${currentRoomId}/start`, 'POST');
-        console.log("Game start request sent. Waiting for room state update.");
-    } catch (error) {
-        console.error("Error starting game:", error.message);
-    }
+    // Emit startGame event via socket
+    socket.emit('startGame', { roomId: currentRoomId, userId: currentUserId });
+    console.log("Game start request sent via socket. Waiting for room state update.");
 });
 
 leaveLobbyBtn.addEventListener('click', async () => {
     if (!currentRoomId) {
-        showErrorMessage("No room to leave."); // More specific message
+        showErrorMessage("No room to leave.");
         return;
     }
-    try {
-        const response = await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
-        console.log(response.message);
-        showNotification('You have left the room.');
-        resetGameAndGoHome();
-    } catch (error) {
-        console.error("Error leaving room:", error.message);
-    }
+    // Emit leaveRoom event via socket
+    socket.emit('leaveRoom', { roomId: currentRoomId, userId: currentUserId });
+    showNotification('You have left the room.');
+    resetGameAndGoHome();
 });
 
 // Game Screen Actions
@@ -495,38 +522,31 @@ leaveGameButton.addEventListener('click', async () => {
         showErrorMessage("No game in progress to leave.");
         return;
     }
-    try {
-        const response = await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
-        console.log(response.message);
-        showNotification('You have left the game.');
-        resetGameAndGoHome();
-    }
-    catch (error) {
-        console.error("Error leaving game:", error.message);
-    }
+    // Emit leaveRoom event via socket
+    socket.emit('leaveRoom', { roomId: currentRoomId, userId: currentUserId });
+    showNotification('You have left the game.');
+    resetGameAndGoHome();
 });
 
 // Game Over Screen Actions
 playAgainButton.addEventListener('click', () => {
-    resetGameAndGoHome(); // Resets state and goes to home
+    resetGameAndGoHome();
 });
 
 returnToHomeButton.addEventListener('click', () => {
-    resetGameAndGoHome(); // Resets state and goes to home
+    resetGameAndGoHome();
 });
 
 
 // --- Initialization ---
 function initializeUser() {
-    // Always show the home screen first
     showScreen(homeScreen);
 
-    // If user data exists in localStorage, pre-fill username input
     if (currentUserId && currentUsername) {
         usernameInput.value = currentUsername;
         showNotification(`Welcome back, ${currentUsername}!`);
     } else {
-        usernameInput.value = ''; // Clear username input for new users
+        usernameInput.value = '';
     }
 }
 
