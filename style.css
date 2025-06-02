@@ -38,8 +38,8 @@ body {
     border-radius: 16px;
     box-shadow: 0 15px 30px rgba(0, 0, 0, 0.4); /* Stronger, softer shadow */
     width: 100%;
-    /* --- KEY CHANGE FOR LAPTOP UI --- */
-    max-width: 850px; /* Set a comfortable max-width for laptop screens */
+    /* --- Adjusted max-width for Laptop UI --- */
+    max-width: 700px; /* Set a more contained max-width */
     /* -------------------------------- */
     text-align: center;
     border: 1px solid rgba(255, 255, 255, 0.08); /* Subtle border */
@@ -171,7 +171,7 @@ h3 {
     background: linear-gradient(45deg, #c53030, #e53e3e);
 }
 
-/* Tailwind-like utility classes for spacing and layout */
+/* Custom utility classes replacing some Tailwind equivalents */
 .w-full { width: 100%; }
 .mt-4 { margin-top: 1rem; }
 .mt-6 { margin-top: 1.5rem; }
@@ -185,6 +185,9 @@ h3 {
 .px-4 { padding-left: 1rem; padding-right: 1rem; }
 .p-6 { padding: 1.5rem; }
 .rounded-lg { border-radius: 0.5rem; }
+.space-y-2 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.5rem; }
+.space-y-3 > :not([hidden]) ~ :not([hidden]) { margin-top: 0.75rem; }
+.space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
 
 .text-center { text-align: center; }
 .text-xl { font-size: 1.25rem; }
@@ -210,13 +213,14 @@ h3 {
 
 .card {
     background-color: var(--bg-light);
-    padding: 2.5rem;
+    padding: 2.5rem; /* Increased padding for better spacing */
     border-radius: 12px;
     box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
     border: 1px solid rgba(255, 255, 255, 0.08);
+    /* No max-width here, it will naturally fill the container's width */
 }
 
-.max-w-lg { max-width: 32rem; }
+/* Removed max-w-lg from here as it's now on individual .card elements in HTML */
 
 .hidden {
     display: none;
@@ -321,7 +325,7 @@ ul {
 .options-grid {
     display: grid;
     gap: 15px;
-    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); /* Ensures good width on larger screens */
 }
 
 .options-grid-item {
@@ -433,7 +437,7 @@ ul {
 
 @media (max-width: 992px) { /* Adjust for larger tablets and smaller laptops */
     .container {
-        max-width: 700px;
+        max-width: 600px; /* Further reduction */
         padding: 35px;
     }
     h1 { font-size: 3rem; }

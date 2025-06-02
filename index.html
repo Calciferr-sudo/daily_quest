@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daily Bloom Quiz</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -15,17 +14,27 @@
         <div id="error-message" class="error-banner hidden"></div>
         <div id="notification-message" class="notification-banner hidden"></div>
 
+
         <div id="home-screen" class="screen">
             <h2 class="mb-6 text-indigo-400">Welcome!</h2>
             <div class="input-group">
                 <label for="username-input" class="label">Enter Your Username:</label>
                 <input type="text" id="username-input" placeholder="e.g., QuizMaster" class="input-field">
             </div>
-            <button id="save-username-btn" class="btn btn-primary w-full mt-4">Save Username</button>
+            <button id="save-username-btn" class="btn btn-primary w-full mt-4">Save Username & Continue</button>
 
             <div class="divider">OR</div>
 
             <h2 class="mb-4 text-indigo-400">Join a Room</h2>
+            <div class="input-group">
+                <label for="room-id-input" class="label">Enter Room ID:</label>
+                <input type="text" id="room-id-input" placeholder="e.g., ABCDEF" class="input-field">
+            </div>
+            <button id="join-room-btn" class="btn btn-secondary w-full">Join Room</button>
+
+            <div class="divider">OR</div>
+
+            <h2 class="mb-4 text-indigo-400">Create a New Room</h2>
             <div class="input-group">
                 <label for="difficulty-select" class="label">Select Difficulty:</label>
                 <select id="difficulty-select" class="input-field">
@@ -34,46 +43,29 @@
                     <option value="hard">Hard</option>
                 </select>
             </div>
-            <button id="create-room-btn" class="btn btn-secondary w-full mt-4">Create New Room</button>
-
-            <div class="divider">OR</div>
-
-            <h2 class="mb-4 text-indigo-400">Join Existing Room</h2>
-            <div class="input-group">
-                <label for="room-id-input" class="label">Enter Room ID:</label>
-                <input type="text" id="room-id-input" placeholder="e.g., ABCDEF" class="input-field uppercase">
-            </div>
-            <button id="join-room-btn" class="btn btn-secondary w-full mt-4">Join Room</button>
+            <button id="create-room-btn" class="btn btn-primary w-full">Create Room</button>
         </div>
 
         <div id="lobby-screen" class="screen hidden">
-            <h2 class="mb-6 text-purple-400">Lobby</h2>
-            <p class="text-xl font-semibold mb-4">Room ID: <span id="lobby-room-id" class="text-indigo-400"></span></p>
-            <p id="lobby-status" class="text-lg mb-6 text-slate-400">Waiting for players...</p>
-
-            <h3 class="text-xl font-semibold mb-3 text-slate-700">Players in Room:</h3>
-            <ul id="player-list" class="space-y-2 mb-8">
+            <h2 class="mb-6">Lobby <span class="text-indigo-400" id="lobby-room-id"></span></h2>
+            <h3 class="mb-4 text-slate-400" id="lobby-status"></h3>
+            <ul id="player-list" class="space-y-3 mb-8">
                 </ul>
-
-            <div class="space-y-4">
-                <button id="start-game-btn" class="btn btn-primary w-full hidden">Start Game</button>
-                <button id="leave-lobby-btn" class="btn btn-danger w-full">Leave Room</button>
-            </div>
+            <button id="start-game-btn" class="btn btn-primary w-full mb-4">Start Game</button>
+            <button id="leave-lobby-btn" class="btn btn-danger w-full">Leave Lobby</button>
         </div>
 
         <div id="game-screen" class="screen hidden">
-            <div class="game-header">
-                <p id="question-counter" class="text-xl font-semibold text-teal-400">Question 0 of 5</p>
-                <p id="timer" class="text-2xl font-bold text-rose-400">Time Left: 15s</p>
+            <div class="game-header mb-8">
+                <p id="question-counter" class="text-xl font-semibold text-teal-400">Question X of Y</p>
+                <p id="timer" class="text-3xl font-bold text-rose-400">Time Left: 10s</p>
             </div>
 
-            <div class="card bg-slate-700 p-6 rounded-lg mb-8">
-                <p id="question-text" class="text-2xl font-semibold mb-6">Question goes here?</p>
+            <div class="card mb-8"> <p id="question-text" class="text-2xl font-medium text-light mb-6">Loading question...</p>
                 <div id="options-container" class="options-grid">
                     </div>
             </div>
 
-            <h3 class="text-xl font-semibold mb-3 text-slate-700">Scoreboard:</h3>
             <div class="scoreboard">
                 <div class="scoreboard-card">
                     <p id="player1NameGame" class="player-name">Player 1</p>
@@ -86,12 +78,11 @@
                     <p id="player2AnswerStatus" class="player-status">Thinking...</p>
                 </div>
             </div>
-             <button id="leaveGameButton" class="btn btn-danger w-full mt-8">Leave Game (Forfeit)</button>
+             <button id="leaveGameButton" class="btn btn-danger w-full mt-8">Leave Game (Forfeit)</button> 
         </div>
 
         <div id="gameOverScreen" class="screen hidden">
-            <div class="card w-full max-w-lg text-center">
-                <h2 class="text-5xl font-bold text-rose-500 mb-6">Game Over!</h2>
+            <div class="card text-center"> <h2 class="text-5xl font-bold text-rose-500 mb-6">Game Over!</h2>
                 <p id="winnerInfo" class="text-3xl text-teal-600 mb-8 font-semibold">Winner is...</p>
                 <h3 class="text-xl font-semibold mb-3 text-slate-700">Final Scores:</h3>
                 <ul id="finalScoresList" class="space-y-2 mb-10">
