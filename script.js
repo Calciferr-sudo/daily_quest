@@ -567,15 +567,21 @@ returnToHomeButton.addEventListener('click', () => {
 
 
 // --- Initialization ---
+// ... (rest of your script.js code above this function)
+
+// --- Initialization ---
 function initializeUser() {
+    // Always show the home screen first
+    showScreen(homeScreen);
+
+    // If user data exists in localStorage, pre-fill username input
+    // and show a welcome back message.
     if (currentUserId && currentUsername) {
-        // If user already has ID/username, skip home screen and go to lobby options
-        showScreen(lobbyScreen);
         usernameInput.value = currentUsername; // Prefill username input
         showNotification(`Welcome back, ${currentUsername}!`);
     } else {
-        // No existing user, show home screen to create username
-        showScreen(homeScreen);
+        // Clear username input if no existing user
+        usernameInput.value = '';
     }
 }
 
