@@ -1,627 +1,528 @@
 // --- DOM Elements ---
-const homeScreen = document.getElementById('homeScreen'); // Corrected ID based on HTML
-const lobbyScreen = document.getElementById('lobbyScreen'); // Corrected ID based on HTML
-const gameScreen = document.getElementById('gameScreen'); // Corrected ID based on HTML
-const gameOverScreen = document.getElementById('gameOverScreen'); // Corrected ID based on HTML
-const errorMessage = document.getElementById('errorMessage'); // Corrected ID based on HTML
+const homeScreen = document.getElementById('home-screen');
+const lobbyScreen = document.getElementById('lobby-screen');
+const gameScreen = document.getElementById('game-screen');
+const gameOverScreen = document.getElementById('gameOverScreen');
+const errorMessage = document.getElementById('error-message'); // Ensure this element exists if used for error messages
 
 // Home Screen Elements
-const usernameInput = document.getElementById('usernameInput'); // Corrected ID based on HTML
-const saveUsernameBtn = document.getElementById('saveUsernameBtn'); // Corrected ID based on HTML
-const difficultySelect = document.getElementById('difficultySelect'); // Corrected ID based on HTML
-const createRoomButton = document.getElementById('createRoomButton'); // Corrected ID based on HTML
-const roomIdInput = document.getElementById('roomIdInput'); // Corrected ID based on HTML
-const joinRoomButton = document.getElementById('joinRoomButton'); // Corrected ID based on HTML
+const usernameInput = document.getElementById('username-input');
+const saveUsernameBtn = document.getElementById('save-username-btn');
+const difficultySelect = document.getElementById('difficulty-select');
+const createRoomBtn = document.getElementById('create-room-btn');
+const roomIdInput = document.getElementById('room-id-input');
+const joinRoomBtn = document.getElementById('join-room-btn');
 
 // Lobby Screen Elements
-const currentRoomIdDisplay = document.getElementById('currentRoomIdDisplay'); // Corrected ID based on HTML
-const playerListLobby = document.getElementById('playerListLobby'); // Corrected ID based on HTML
-const startGameButton = document.getElementById('startGameButton'); // Corrected ID based on HTML
-const leaveLobbyButton = document.getElementById('leaveLobbyButton'); // Corrected ID based on HTML
+const lobbyRoomId = document.getElementById('lobby-room-id');
+const playerList = document.getElementById('player-list');
+const lobbyStatus = document.getElementById('lobby-status');
+const startGameBtn = document.getElementById('start-game-btn');
+const leaveLobbyBtn = document.getElementById('leave-lobby-btn');
 
 // Game Screen Elements
-const roundInfoDisplay = document.getElementById('roundInfoDisplay'); // Corrected ID based on HTML
-const timerDisplay = document.getElementById('timerDisplay'); // Corrected ID based on HTML
-const questionDisplay = document.getElementById('questionDisplay'); // Corrected ID based on HTML
-const answerInput = document.getElementById('answerInput'); // Corrected ID based on HTML
-const submitAnswerButton = document.getElementById('submitAnswerButton'); // Corrected ID based on HTML
-const player1NameGame = document.getElementById('player1NameGame'); // Corrected ID based on HTML
-const player1ScoreGame = document.getElementById('player1ScoreGame'); // Corrected ID based on HTML
-const player1AnswerStatus = document.getElementById('player1AnswerStatus'); // Corrected ID based on HTML
-const player2NameGame = document.getElementById('player2NameGame'); // Corrected ID based on HTML
-const player2ScoreGame = document.getElementById('player2ScoreGame'); // Corrected ID based on HTML
-const player2AnswerStatus = document.getElementById('player2AnswerStatus'); // Corrected ID based on HTML
-const waitingForQuestionSpinner = document.getElementById('waitingForQuestionSpinner'); // Corrected ID based on HTML
-const answerCountDisplay = document.getElementById('answerCountDisplay'); // Corrected ID based on HTML
-const leaveGameButton = document.getElementById('leaveGameButton'); // Corrected ID based on HTML
+const questionCounter = document.getElementById('question-counter');
+const timerDisplay = document.getElementById('timer');
+const questionText = document.getElementById('question-text');
+const optionsContainer = document.getElementById('options-container'); // This was for multiple choice, now used for textarea
+const answerInput = document.getElementById('answer-input'); // New for text area
+const answerCountDisplay = document.getElementById('answer-count-display'); // New for text area count
+const submitAnswerBtn = document.getElementById('submit-answer-btn');
+const nextQuestionBtn = document.getElementById('next-question-btn');
+const scoreboard = document.getElementById('scoreboard');
+const player1NameGame = document.getElementById('player1NameGame');
+const player1ScoreGame = document.getElementById('player1ScoreGame');
+const player1AnswerStatus = document.getElementById('player1AnswerStatus');
+const player2NameGame = document.getElementById('player2NameGame');
+const player2ScoreGame = document.getElementById('player2ScoreGame');
+const player2AnswerStatus = document.getElementById('player2AnswerStatus');
+const leaveGameButton = document.getElementById('leaveGameButton');
 
 // Game Over Screen Elements
-const winnerInfo = document.getElementById('winnerInfo'); // Corrected ID based on HTML
-const finalScoresList = document.getElementById('finalScoresList'); // Corrected ID based on HTML
-const playAgainButton = document.getElementById('playAgainButton'); // Corrected ID based on HTML
-const backToHomeButton = document.getElementById('backToHomeButton'); // Corrected ID based on HTML
-
-// Message Overlay Elements
-const messageOverlay = document.getElementById('messageOverlay'); // Corrected ID based on HTML
-const messageText = document.getElementById('messageText'); // Corrected ID based on HTML
-const closeMessageButton = document.getElementById('closeMessageButton'); // Corrected ID based on HTML
+const finalScoresList = document.getElementById('finalScoresList'); // Corrected ID from 'final-scores'
+const winnerInfo = document.getElementById('winnerInfo'); // Corrected ID from 'winner'
+const playAgainButton = document.getElementById('playAgainButton');
+const returnToHomeButton = document.getElementById('returnToHomeButton');
 
 
-// --- Game State (Client-Side) ---
-let currentUserId = null;
-let currentUsername = localStorage.getItem('username') || ''; // Load from local storage
+// --- Game State Variables ---
+const BACKEND_URL = 'http://localhost:3000'; // Make sure this matches your backend URL
+let currentUserId = localStorage.getItem('userId');
+let currentUsername = localStorage.getItem('username');
 let currentRoomId = null;
-let roomState = null; // Will store the full room data from the server
+let roomState = null; // Stores the current state of the room from the backend
+let pollingInterval = null;
 let timerInterval = null;
-let currentRoundTimer = null; // To hold the actual countdown interval
-const ROUND_DURATION = 60; // seconds
-
-// --- Server API Base URL ---
-// IMPORTANT: Replace with your Render.com backend URL after deployment
-const API_BASE_URL = 'https://quiz-backend-bs3b.onrender.com'; // Change to your Render.com URL in production
+let countdownTime = 0;
 
 // --- Utility Functions ---
-function showScreen(screenElement) {
-    document.querySelectorAll('.screen').forEach(screen => {
-        screen.classList.add('hidden'); // Use hidden class from Tailwind
-    });
-    screenElement.classList.remove('hidden'); // Show the active screen
-    // Scroll to top when changing screens for better UX on mobile
-    window.scrollTo(0, 0);
+function showScreen(screen) {
+    homeScreen.classList.add('hidden');
+    lobbyScreen.classList.add('hidden');
+    gameScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden');
+    screen.classList.remove('hidden');
 }
 
-function showMessage(message, duration = 3000) {
-    messageText.textContent = message;
-    messageOverlay.classList.remove('hidden');
-    if (duration) {
+function showErrorMessage(message) {
+    console.error("Error:", message);
+    if (errorMessage) {
+        errorMessage.textContent = message;
+        errorMessage.classList.remove('hidden');
         setTimeout(() => {
-            messageOverlay.classList.add('hidden');
-        }, duration);
+            errorMessage.classList.add('hidden');
+        }, 5000); // Hide after 5 seconds
+    } else {
+        alert("Error: " + message); // Fallback if no error message element
     }
 }
-closeMessageButton.addEventListener('click', () => messageOverlay.classList.add('hidden'));
 
-
-function displayError(message) {
-    errorMessage.textContent = message;
-    errorMessage.classList.remove('hidden'); // Show the error message
-    errorMessage.classList.remove('bg-green-500'); // Remove potential success styling
-    errorMessage.classList.add('bg-red-500'); // Ensure it's red for errors
-    setTimeout(() => {
-        errorMessage.classList.add('hidden'); // Hide after 5 seconds
-    }, 5000);
-}
-
-function displaySuccess(message) {
-    errorMessage.textContent = message;
-    errorMessage.classList.remove('hidden'); // Show the message
-    errorMessage.classList.remove('bg-red-500'); // Remove potential error styling
-    errorMessage.classList.add('bg-green-500'); // Make it green for success
-    setTimeout(() => {
-        errorMessage.classList.add('hidden'); // Hide after 5 seconds
-    }, 5000);
+// Function to safely parse user input for 8 answers
+function parseAnswers(text) {
+    // Split by newlines, commas, or spaces, then filter out empty strings and trim
+    const answers = text.split(/[\n, ]+/)
+                      .map(s => s.trim())
+                      .filter(s => s.length > 0);
+    // Ensure we only take up to 8 answers
+    return answers.slice(0, 8);
 }
 
 
+// --- API Call Helper ---
 async function apiCall(endpoint, method = 'GET', data = null) {
-    try {
-        const options = {
-            method: method,
-            headers: {
-                'Content-Type': 'application/json',
-                // Always send user ID and username if available
-                ...(currentUserId && { 'X-User-ID': currentUserId }),
-                ...(currentUsername && { 'X-Username': currentUsername })
-            }
-        };
-        if (data) {
-            options.body = JSON.stringify(data);
-        }
+    const headers = {
+        'Content-Type': 'application/json',
+        'x-user-id': currentUserId, // Always send user ID
+        'x-username': currentUsername // Always send username
+    };
 
-        const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+    const config = {
+        method: method,
+        headers: headers,
+    };
+
+    if (data) {
+        config.body = JSON.stringify(data);
+    }
+
+    try {
+        const response = await fetch(`${BACKEND_URL}${endpoint}`, config);
         const result = await response.json();
 
         if (!response.ok) {
-            // Check if result.message exists, otherwise use a generic error
-            const errorMessage = result.message || `API request failed with status ${response.status}: ${JSON.stringify(result)}`;
-            console.error('API Call Error:', errorMessage, result);
-            displayError(errorMessage);
-            throw new Error(errorMessage); 
+            showErrorMessage(result.message || `API Error: ${response.status}`);
+            throw new Error(result.message || `API Error: ${response.status}`);
         }
         return result;
     } catch (error) {
-        console.error('API Call Error:', error);
-        // displayError(error.message); // Already called by displayError above, avoid double
-        throw error; // Re-throw to be caught by specific handlers
+        console.error("API call failed:", error);
+        showErrorMessage(`Network or API Error: ${error.message}`);
+        throw error;
     }
 }
 
-// --- Initial Setup ---
+// --- User & Auth ---
+
 async function initializeUser() {
-    if (!currentUsername) {
-        currentUsername = `Player_${Math.random().toString(36).substring(2, 8)}`;
-        localStorage.setItem('username', currentUsername);
-    }
-    usernameInput.value = currentUsername;
-
-    // Register/authenticate user with backend to get a unique ID
-    try {
-        const response = await apiCall('/api/auth/anonymous', 'POST', { username: currentUsername });
-        currentUserId = response.userId;
-        console.log('Authenticated with user ID:', currentUserId);
-        
-        if (response.username) {
-            currentUsername = response.username; // Server might return a normalized username
-            usernameInput.value = currentUsername;
+    if (!currentUserId) {
+        // No user ID in localStorage, prompt for username
+        showScreen(homeScreen);
+        usernameInput.value = ''; // Clear previous input
+    } else {
+        // User ID exists, try to authenticate with backend to get current username
+        try {
+            const result = await apiCall('/api/auth/anonymous', 'POST');
+            currentUsername = result.username;
             localStorage.setItem('username', currentUsername);
+            usernameInput.value = currentUsername; // Prefill username input
+            showScreen(homeScreen); // Go to home screen after initialization
+        } catch (error) {
+            console.error("Failed to re-authenticate user:", error);
+            // If re-authentication fails, clear local storage and force new login
+            currentUserId = null;
+            currentUsername = null;
+            localStorage.removeItem('userId');
+            localStorage.removeItem('username');
+            showScreen(homeScreen);
         }
-    } catch (error) {
-        displayError('Failed to initialize user. Please refresh the page and try again.');
-        // Disable buttons if authentication fails to prevent further issues
-        createRoomButton.disabled = true;
-        joinRoomButton.disabled = true;
-        saveUsernameBtn.disabled = true;
     }
 }
-
-// --- Event Handlers ---
 
 saveUsernameBtn.addEventListener('click', async () => {
     const newUsername = usernameInput.value.trim();
-    if (newUsername && newUsername !== currentUsername) {
-        try {
-            // Send user ID to backend to update their username
-            await apiCall('/api/user/update-username', 'POST', { newUsername: newUsername });
-            currentUsername = newUsername;
-            localStorage.setItem('username', currentUsername);
-            displaySuccess('Username updated!'); 
-        } catch (error) {
-            // Error displayed by apiCall
+    if (newUsername.length < 3) {
+        showErrorMessage('Username must be at least 3 characters long.');
+        return;
+    }
+
+    try {
+        let result;
+        if (!currentUserId) {
+            // First time login
+            result = await apiCall('/api/auth/anonymous', 'POST', { username: newUsername });
+        } else {
+            // Update existing username
+            result = await apiCall('/api/user/update-username', 'POST', { newUsername: newUsername });
         }
-    } else {
-        displayError("Please enter a new username.");
+        currentUserId = result.userId;
+        currentUsername = result.username;
+        localStorage.setItem('userId', currentUserId);
+        localStorage.setItem('username', currentUsername);
+        showScreen(homeScreen); // Stay on home after saving username
+        showErrorMessage('Username saved successfully!');
+    } catch (error) {
+        // Error message already handled by apiCall
     }
 });
 
 
-createRoomButton.addEventListener('click', async () => { // Corrected ID
-    if (!currentUsername) {
-        displayError("Please set a username first.");
+// --- Room Management ---
+
+createRoomBtn.addEventListener('click', async () => {
+    if (!currentUserId) {
+        showErrorMessage('Please set your username first.');
         return;
     }
     const difficulty = difficultySelect.value;
     try {
-        const room = await apiCall('/api/rooms/create', 'POST', { difficulty: difficulty });
+        const room = await apiCall('/api/rooms/create', 'POST', { difficulty });
         currentRoomId = room.roomId;
-        joinRoomUpdates(room); // Pass the initial room state
+        startRoomPolling(currentRoomId);
         showScreen(lobbyScreen);
+        updateLobbyUI(room);
     } catch (error) {
-        // Error displayed by apiCall
+        // Error message already handled by apiCall
     }
 });
 
-joinRoomButton.addEventListener('click', async () => { // Corrected ID
-    if (!currentUsername) {
-        displayError("Please set a username first.");
+joinRoomBtn.addEventListener('click', async () => {
+    if (!currentUserId) {
+        showErrorMessage('Please set your username first.');
         return;
     }
-    const id = roomIdInput.value.trim().toUpperCase();
-    if (!id) {
-        displayError("Please enter a Room ID.");
+    const roomId = roomIdInput.value.trim().toUpperCase();
+    if (!roomId) {
+        showErrorMessage('Please enter a Room ID.');
         return;
     }
     try {
-        const room = await apiCall(`/api/rooms/join/${id}`, 'POST');
+        const room = await apiCall(`/api/rooms/join/${roomId}`, 'POST');
         currentRoomId = room.roomId;
-        joinRoomUpdates(room); // Pass the initial room state
+        startRoomPolling(currentRoomId);
         showScreen(lobbyScreen);
+        updateLobbyUI(room);
     } catch (error) {
-        // Error displayed by apiCall
+        // Error message already handled by apiCall
     }
 });
 
-startGameButton.addEventListener('click', async () => { // Corrected ID
-    if (!currentRoomId) {
-        displayError("No active room to start the game.");
-        return;
-    }
+leaveLobbyBtn.addEventListener('click', async () => {
+    if (!currentRoomId) return;
     try {
-        await apiCall(`/api/rooms/${currentRoomId}/start`, 'POST');
-        // Game state will be updated by polling (see below)
-    } catch (error) {
-        // Error displayed by apiCall
-    }
-});
-
-leaveLobbyButton.addEventListener('click', async () => { // Corrected ID
-    if (!currentRoomId) {
-        showScreen(homeScreen);
-        return;
-    }
-    try {
-        await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
-        displaySuccess("Left the lobby.");
-    } catch (error) {
-        // Error displayed by apiCall
-    } finally {
-        // Always return home and clean up client state regardless of server response
+        const result = await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
+        clearInterval(pollingInterval);
+        clearInterval(timerInterval); // Clear timer if it was running
         currentRoomId = null;
         roomState = null;
-        if (timerInterval) clearInterval(timerInterval);
-        if (currentRoundTimer) clearInterval(currentRoundTimer);
         showScreen(homeScreen);
-        usernameInput.value = currentUsername; // Keep username
-        roomIdInput.value = ''; // Clear room ID input
+        if (result.message === 'Room deleted.') {
+            showErrorMessage('Lobby left. Room deleted.');
+        } else {
+            showErrorMessage('Left lobby successfully.');
+        }
+    } catch (error) {
+        // Error message already handled by apiCall
     }
 });
 
-submitAnswerButton.addEventListener('click', async () => { // Corrected ID
-    if (!currentRoomId || !currentUserId || !roomState) {
-        displayError("Game state not ready to submit answer.");
-        return;
-    }
-    const answerText = answerInput.value.trim();
-    const numAnswers = countAnswers(answerText);
-
-    if (numAnswers < 8) {
-        displayError("You need to list exactly 8 items.");
-        return;
-    }
-    
-    // Disable submission to prevent double-sends
-    answerInput.disabled = true;
-    submitAnswerButton.disabled = true;
-    
+leaveGameButton.addEventListener('click', async () => {
+    if (!currentRoomId) return;
     try {
-        await apiCall(`/api/rooms/${currentRoomId}/answer`, 'POST', { 
-            round: roomState.currentRound, // Pass current round
-            answers: parseAnswers(answerText) // Pass parsed answers
-        });
-        displaySuccess("Answers submitted!");
-        // Server will handle scoring and game state update
-    } catch (error) {
-        // Re-enable if API call fails
-        answerInput.disabled = false;
-        updateAnswerCount(); // Re-evaluate button state
-        // Error already displayed by apiCall
-    }
-});
-
-leaveGameButton.addEventListener('click', async () => { // Corrected ID
-    if (!currentRoomId) {
-        showScreen(homeScreen);
-        return;
-    }
-    try {
-        await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
-        displaySuccess("Left the game.");
-    } catch (error) {
-        // Error displayed by apiCall
-    } finally {
-        // Always return home and clean up client state regardless of server response
+        const result = await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
+        clearInterval(pollingInterval);
+        clearInterval(timerInterval); // Clear timer
         currentRoomId = null;
         roomState = null;
-        if (timerInterval) clearInterval(timerInterval);
-        if (currentRoundTimer) clearInterval(currentRoundTimer);
         showScreen(homeScreen);
-        usernameInput.value = currentUsername; // Keep username
-        roomIdInput.value = ''; // Clear room ID input
+        if (result.message === 'Room deleted.') {
+            showErrorMessage('Game left. Room deleted.');
+        } else {
+            showErrorMessage('Left game successfully.');
+        }
+    } catch (error) {
+        // Error message already handled by apiCall
     }
 });
 
 
-playAgainButton.addEventListener('click', () => { // Corrected ID
-    currentRoomId = null;
-    roomState = null;
-    if (timerInterval) clearInterval(timerInterval);
-    if (currentRoundTimer) clearInterval(currentRoundTimer);
-    usernameInput.value = currentUsername; // Reset username input
-    roomIdInput.value = ''; // Clear room ID input
-    showScreen(homeScreen);
-});
-
-backToHomeButton.addEventListener('click', () => { // Corrected ID
-    currentRoomId = null;
-    roomState = null;
-    if (timerInterval) clearInterval(timerInterval);
-    if (currentRoundTimer) clearInterval(currentRoundTimer);
-    usernameInput.value = currentUsername; // Reset username input
-    roomIdInput.value = ''; // Clear room ID input
-    showScreen(homeScreen);
-});
-
-
-// --- Game State Polling (Simplified Real-time) ---
-// In a real production app, WebSockets (Socket.IO) would be used for true real-time updates.
-// For this simple example, we'll poll the server every second.
-function joinRoomUpdates(initialRoomData) {
-    roomState = initialRoomData; // Set initial state
-    updateUI(roomState); // Update UI immediately
-
-    // Clear any previous interval
-    if (timerInterval) {
-        clearInterval(timerInterval);
-    }
-
-    timerInterval = setInterval(async () => {
-        if (currentRoomId && currentUserId) {
-            try {
-                const room = await apiCall(`/api/rooms/${currentRoomId}`);
-                if (room) {
-                    // Only update if the room data has changed significantly or if it's a specific game state update
-                    // This simple check prevents unnecessary UI updates for identical data
-                    if (JSON.stringify(room) !== JSON.stringify(roomState)) {
-                        roomState = room; // Update local state
-                        updateUI(roomState);
-                    }
-                }
-            } catch (error) {
-                // Error handling for polling, maybe room was deleted?
-                console.warn("Polling failed, room might be gone:", error.message);
-                if (currentRoomId) { // Only reset if we were in a room
-                    // displayError(`Lost connection to room. Returning to home. (${error.message})`);
-                    // This can be annoying if it's just a temporary network blip
-                    // Instead, silently handle or only show message for critical errors
-                    if (error.message.includes("Room not found") || error.message.includes("does not exist")) {
-                        displayError("The room has been closed or no longer exists. Returning to home.");
-                        currentRoomId = null;
-                        roomState = null;
-                        if (timerInterval) clearInterval(timerInterval);
-                        if (currentRoundTimer) clearInterval(currentRoundTimer);
-                        showScreen(homeScreen);
-                        usernameInput.value = currentUsername;
-                        roomIdInput.value = '';
-                    }
-                }
+// --- Realtime Updates (Polling) ---
+function startRoomPolling(roomId) {
+    clearInterval(pollingInterval); // Clear any existing interval
+    pollingInterval = setInterval(async () => {
+        try {
+            const room = await apiCall(`/api/rooms/${roomId}`);
+            updateUI(room);
+        } catch (error) {
+            console.error("Polling error:", error);
+            // If room not found (e.g., deleted by host), redirect to home
+            if (error.message.includes('Room not found')) {
+                clearInterval(pollingInterval);
+                clearInterval(timerInterval);
+                currentRoomId = null;
+                roomState = null;
+                showScreen(homeScreen);
+                showErrorMessage('The room no longer exists or you were removed.');
             }
         }
     }, 1000); // Poll every 1 second
 }
 
 function updateUI(room) {
-    if (!room) {
-        console.warn("Attempted to update UI with null room data.");
-        return;
+    roomState = room; // Update global room state
+
+    if (room.status === 'waiting' && homeScreen.classList.contains('hidden')) {
+        updateLobbyUI(room);
+        showScreen(lobbyScreen);
+    } else if (room.status === 'playing' && gameScreen.classList.contains('hidden')) {
+        showScreen(gameScreen);
+        startGameUI(room); // Initialize game screen UI
+    } else if (room.status === 'finished' && gameOverScreen.classList.contains('hidden')) {
+        showScreen(gameOverScreen);
+        updateResultsScreen(room);
+        clearInterval(pollingInterval); // Stop polling when game is finished
+        clearInterval(timerInterval); // Stop timer
     }
 
-    // Update screen based on room status
-    switch (room.status) {
-        case 'waiting':
-            showScreen(lobbyScreen);
-            currentRoomIdDisplay.textContent = `Room ID: ${room.roomId}`;
-            updateLobbyUI(room);
-            break;
-        case 'playing':
-            showScreen(gameScreen);
-            updateGameUI(room);
-            startRoundTimer(room); // Start/update timer based on room state
-            break;
-        case 'finished':
-            showScreen(gameOverScreen);
-            updateResultsScreen(room);
-            if (timerInterval) clearInterval(timerInterval); // Stop polling for finished game
-            if (currentRoundTimer) clearInterval(currentRoundTimer); // Clear round timer
-            break;
-        default:
-            showScreen(homeScreen); // Fallback
-            break;
+    // Always update common elements based on current screen
+    if (room.status === 'playing') {
+        updateGameUI(room);
     }
 }
 
 function updateLobbyUI(room) {
-    playerListLobby.innerHTML = '';
-    if (!room.players || Object.keys(room.players).length === 0) {
-        playerListLobby.innerHTML += '<li class="p-3 text-teal-700 animate-pulse">Waiting for players...</li>';
-        startGameButton.classList.add('hidden');
-        startGameButton.disabled = true;
-        return;
-    }
-
-    const playersArray = Object.values(room.players);
-    playersArray.forEach(player => {
+    lobbyRoomId.textContent = room.roomId;
+    playerList.innerHTML = ''; // Clear existing players
+    room.players.forEach(player => {
         const li = document.createElement('li');
-        li.className = 'p-3 bg-white/20 rounded-lg shadow text-gray-800 text-lg';
-        li.textContent = `${player.username} ${player.userId === currentUserId ? '(You!)' : ''} ${room.hostId === player.userId ? '👑 (Host)' : ''}`;
-        playerListLobby.appendChild(li);
+        li.textContent = `${player.username} ${player.id === currentUserId ? '(You)' : ''}`;
+        playerList.appendChild(li);
     });
 
-    // Only host can start game
-    if (room.hostId === currentUserId && playersArray.length >= 2) {
-        startGameButton.classList.remove('hidden');
-        startGameButton.disabled = false;
+    if (room.hostId === currentUserId) {
+        lobbyStatus.textContent = `You are the host. Waiting for 2 players...`;
+        startGameBtn.classList.toggle('hidden', room.players.length < 2);
     } else {
-        startGameButton.classList.add('hidden');
-        startGameButton.disabled = true;
-        if (playersArray.length < 2) {
-            playerListLobby.innerHTML += '<li class="p-3 text-teal-700 animate-pulse">Waiting for at least 2 players to start...</li>';
-        }
+        lobbyStatus.textContent = `Waiting for host to start the game.`;
+        startGameBtn.classList.add('hidden');
     }
+}
+
+// --- Game Logic ---
+startGameBtn.addEventListener('click', async () => {
+    if (!currentRoomId || !roomState || roomState.hostId !== currentUserId) {
+        showErrorMessage('You are not the host or not in a room.');
+        return;
+    }
+    if (roomState.players.length < 2) {
+        showErrorMessage('Need 2 players to start the game.');
+        return;
+    }
+    try {
+        const result = await apiCall(`/api/rooms/${currentRoomId}/start`, 'POST');
+        roomState = result.room; // Update local state with the started room
+        showScreen(gameScreen);
+        startGameUI(roomState);
+    } catch (error) {
+        // Error message already handled by apiCall
+    }
+});
+
+function startGameUI(room) {
+    clearInterval(timerInterval); // Ensure no old timer is running
+    answerInput.value = ''; // Clear previous answers
+    answerInput.disabled = false;
+    submitAnswerBtn.disabled = false;
+    nextQuestionBtn.classList.add('hidden'); // Only host can see this after round ends
+    answerInput.addEventListener('input', updateAnswerCount); // Add event listener for live count
+    updateAnswerCount(); // Initial count
+    updateGameUI(room); // Update initial game state UI
+    startRoundTimer(room.roundStartTime); // Start the timer for the current round
 }
 
 function updateGameUI(room) {
-    const players = room.players;
-    // Ensure player order is consistent, or use default if not set by backend
-    const playerIds = room.playerOrder || Object.keys(players).sort(); 
+    questionCounter.textContent = `${room.currentRound}/${room.maxRounds}`;
+    questionText.textContent = room.currentQuestion ? room.currentQuestion.question : 'Loading question...';
 
-    // Update Player 1 display
-    if (playerIds.length > 0 && players[playerIds[0]]) {
-        const p1 = players[playerIds[0]];
-        player1NameGame.textContent = p1.username + (p1.userId === currentUserId ? " (You)" : "");
-        player1ScoreGame.textContent = p1.score || 0;
-        player1AnswerStatus.textContent = p1.hasAnsweredCurrentRound ? "Answered!" : "Thinking...";
-    } else {
-        player1NameGame.textContent = "Player 1";
-        player1ScoreGame.textContent = "0";
-        player1AnswerStatus.textContent = "Thinking...";
+    // Update scoreboard
+    const player1 = room.players[0];
+    const player2 = room.players[1];
+
+    if (player1) {
+        player1NameGame.textContent = `${player1.username} ${player1.id === currentUserId ? '(You)' : ''}`;
+        player1ScoreGame.textContent = player1.score;
+        player1AnswerStatus.textContent = player1.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
+        player1AnswerStatus.className = player1.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
+    }
+    if (player2) {
+        player2NameGame.textContent = `${player2.username} ${player2.id === currentUserId ? '(You)' : ''}`;
+        player2ScoreGame.textContent = player2.score;
+        player2AnswerStatus.textContent = player2.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
+        player2AnswerStatus.className = player2.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
     }
 
-    // Update Player 2 display
-    if (playerIds.length > 1 && players[playerIds[1]]) {
-        const p2 = players[playerIds[1]];
-        player2NameGame.textContent = p2.username + (p2.userId === currentUserId ? " (You)" : "");
-        player2ScoreGame.textContent = p2.score || 0;
-        player2AnswerStatus.textContent = p2.hasAnsweredCurrentRound ? "Answered!" : "Thinking...";
+    // Host specific UI for next question button
+    const allPlayersAnswered = room.players.every(p => p.hasAnsweredCurrentRound);
+    const roundEnded = (Date.now() - room.roundStartTime) >= 15000; // Check if 15 seconds passed
+
+    if (room.hostId === currentUserId && (allPlayersAnswered || roundEnded)) {
+        nextQuestionBtn.classList.remove('hidden');
     } else {
-        player2NameGame.textContent = "Waiting for Player 2...";
-        player2ScoreGame.textContent = "0";
-        player2AnswerStatus.textContent = "";
+        nextQuestionBtn.classList.add('hidden');
     }
 
-    roundInfoDisplay.textContent = `Round ${room.currentRound} of ${room.maxRounds}`;
-
-    if (room.currentQuestion) {
-        questionDisplay.textContent = room.currentQuestion;
-        waitingForQuestionSpinner.classList.add('hidden'); // Hide spinner when question is ready
-        
-        // Re-enable input/button if current user hasn't answered
-        if (players[currentUserId] && !players[currentUserId].hasAnsweredCurrentRound) {
-            answerInput.disabled = false;
-            // The submit button's disabled state is managed by updateAnswerCount based on input
-            updateAnswerCount(); // Call this to ensure button state is correct on UI update
-        } else {
-            answerInput.disabled = true;
-            submitAnswerButton.disabled = true;
-        }
-
-    } else {
-        questionDisplay.textContent = "Waiting for the next question...";
-        waitingForQuestionSpinner.classList.remove('hidden'); // Show spinner while waiting
+    // Disable input/submit if current user has answered or round time is up
+    const currentUserHasAnswered = room.players.find(p => p.id === currentUserId)?.hasAnsweredCurrentRound;
+    if (currentUserHasAnswered || roundEnded) {
         answerInput.disabled = true;
-        submitAnswerButton.disabled = true;
-    }
-
-    // Reset answer input if round just started or question changed
-    if (room.status === 'playing' && !players[currentUserId].hasAnsweredCurrentRound && answerInput.value !== '') {
-        // Clear input if the user hasn't answered the *current* round yet
-        if (!room.lastRoundReceivedQuestion || room.lastRoundReceivedQuestion !== room.currentQuestion) {
-             answerInput.value = '';
-             updateAnswerCount(); // Reset count display
-             room.lastRoundReceivedQuestion = room.currentQuestion; // Mark that we've processed this question
-        }
-    }
-    // If the round is over, disable input regardless
-    if (room.status === 'round_over' || room.status === 'game_over') {
-        answerInput.disabled = true;
-        submitAnswerButton.disabled = true;
+        submitAnswerBtn.disabled = true;
+    } else {
+        answerInput.disabled = false;
+        submitAnswerBtn.disabled = false;
     }
 }
 
+function startRoundTimer(startTime) {
+    clearInterval(timerInterval);
+    const roundDuration = 15; // seconds
+    countdownTime = roundDuration; // Reset countdown for new round
 
-function startRoundTimer(room) {
-    if (currentRoundTimer) clearInterval(currentRoundTimer); // Clear any existing timer
+    timerInterval = setInterval(() => {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const remaining = roundDuration - elapsed;
+        countdownTime = Math.max(0, remaining); // Ensure it doesn't go negative
+        timerDisplay.textContent = countdownTime;
 
-    if (room.status !== 'playing' || !room.roundStartTime) {
-        timerDisplay.textContent = '00:00';
-        return;
-    }
-
-    const startTime = new Date(room.roundStartTime._seconds * 1000 + room.roundStartTime._nanoseconds / 1000000);
-    const endTime = new Date(startTime.getTime() + ROUND_DURATION * 1000);
-
-    currentRoundTimer = setInterval(() => {
-        const now = new Date();
-        const timeLeft = endTime.getTime() - now.getTime();
-
-        if (timeLeft <= 0) {
-            clearInterval(currentRoundTimer);
-            timerDisplay.textContent = 'Time Up!';
-            // The backend should handle round ending, but client side can react
-            if (!room.currentQuestion || room.currentRoundAnswersComplete || room.status === 'round_over') {
-                // If question is null or answers are complete, means round logic is handled by backend.
-                // Or if status is already round_over, no need to trigger.
-            } else {
-                // If the round isn't over yet and time is up, trigger a server check if host.
-                // This is a fallback, the backend should ideally be authoritative.
-                if (room.hostId === currentUserId) {
-                    console.log("Client-side timer expired for host. Signaling backend.");
-                    // You might have a specific API endpoint for this, or just let polling handle it.
-                    // For now, assume polling will eventually update the state.
-                }
-            }
+        if (countdownTime <= 0) {
+            clearInterval(timerInterval);
+            timerDisplay.textContent = '0';
+            // Optionally, automatically submit or disable input here if time runs out
+            // For now, the backend will determine round end based on its timer or all answers received.
             answerInput.disabled = true;
-            submitAnswerButton.disabled = true;
-            return;
+            submitAnswerBtn.disabled = true;
         }
-
-        const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-
-        timerDisplay.textContent = 
-            `${minutes < 10 ? '0' : ''}${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
     }, 1000);
 }
 
-
-function countAnswers(text) {
-    if (!text.trim()) return 0;
-    // Use regular expression to split by comma or newline, filtering out empty strings
-    return text.split(/[\n,]+/).map(s => s.trim()).filter(s => s !== '').length;
-}
-
-function parseAnswers(text) {
-    if (!text.trim()) return [];
-    // Split by comma or newline, trim each item, filter out empty strings, and convert to lowercase
-    return text.split(/[\n,]+/).map(s => s.trim().toLowerCase()).filter(s => s !== '');
-}
-
-
-answerInput.addEventListener('input', updateAnswerCount);
-
+// Live update answer count for textarea
 function updateAnswerCount() {
-    const count = countAnswers(answerInput.value);
-    answerCountDisplay.textContent = `${count} / 8 answers`;
-
-    if (count === 8) { // Only enable if exactly 8 answers
-        answerCountDisplay.classList.remove('text-red-500');
-        answerCountDisplay.classList.add('text-green-500');
-        submitAnswerButton.disabled = answerInput.disabled; // Keep disabled if input itself is disabled
-    } else {
-        answerCountDisplay.classList.add('text-red-500');
-        answerCountDisplay.classList.remove('text-green-500');
-        submitAnswerButton.disabled = true;
-    }
+    const answers = parseAnswers(answerInput.value);
+    answerCountDisplay.textContent = `${answers.length}/8 items entered`;
 }
 
-function updateResultsScreen(room) {
-    winnerInfo.textContent = ''; // Clear previous winner info
-    finalScoresList.innerHTML = ''; // Clear previous scores
-
-    if (!room.players || Object.keys(room.players).length === 0) {
-        winnerInfo.textContent = "No players in this game.";
+submitAnswerBtn.addEventListener('click', async () => {
+    if (!currentRoomId || !roomState) {
+        showErrorMessage('Not in a game room.');
         return;
     }
+    const answers = parseAnswers(answerInput.value);
+    if (answers.length === 0) {
+        showErrorMessage('Please enter at least one answer.');
+        return;
+    }
+    // Note: The backend expects an array of 8. We send what the user enters, up to 8.
+    // Backend will handle scoring based on matches.
+    try {
+        const result = await apiCall(`/api/rooms/${currentRoomId}/answer`, 'POST', {
+            round: roomState.currentRound, // Pass current round
+            answers: answers // This sends an ARRAY
+        });
+        // Update local room state immediately with received score
+        roomState = result.room;
+        const player = roomState.players.find(p => p.id === currentUserId);
+        if (player) {
+            player.score = result.scoreEarned; // Update own score for current round
+        }
+        answerInput.disabled = true;
+        submitAnswerBtn.disabled = true;
+        updateGameUI(roomState); // Re-render UI based on updated room state
+        showErrorMessage(`Submitted! You earned ${result.scoreEarned} points this round.`);
 
-    const playersArray = Object.values(room.players).sort((a, b) => b.score - a.score); // Sort by score descending
+    } catch (error) {
+        // Error handled by apiCall
+    }
+});
 
-    playersArray.forEach(player => {
+nextQuestionBtn.addEventListener('click', async () => {
+    if (!currentRoomId || !roomState || roomState.hostId !== currentUserId) {
+        showErrorMessage('You are not the host or not in a room.');
+        return;
+    }
+    try {
+        const result = await apiCall(`/api/rooms/${currentRoomId}/next-round`, 'POST');
+        if (result.room.status === 'finished') {
+            showScreen(gameOverScreen);
+            updateResultsScreen(result.room);
+            clearInterval(pollingInterval);
+            clearInterval(timerInterval);
+        } else {
+            roomState = result.room; // Update local state
+            startGameUI(roomState); // Re-initialize game UI for next round
+        }
+    } catch (error) {
+        // Error handled by apiCall
+    }
+});
+
+
+// --- Game Over Screen Logic ---
+function updateResultsScreen(room) {
+    finalScoresList.innerHTML = '';
+    // Sort players by score in descending order
+    const sortedPlayers = room.players.sort((a, b) => b.score - a.score);
+
+    sortedPlayers.forEach(player => {
         const li = document.createElement('li');
-        li.className = 'flex justify-between items-center bg-gray-700 p-3 rounded-md mb-2';
+        li.classList.add('flex', 'justify-between', 'items-center', 'py-2', 'px-4', 'bg-slate-700', 'rounded-lg', 'mb-2');
         li.innerHTML = `
-            <span class="font-bold text-teal-300">${player.username} ${player.userId === currentUserId ? '(You)' : ''}:</span> 
-            <span class="text-xl font-semibold text-yellow-400">${player.score} points</span>
+            <span class="text-xl font-medium">${player.username} ${player.id === currentUserId ? '(You)' : ''}:</span>
+            <span class="text-2xl font-bold text-green-400">${player.score} points</span>
         `;
         finalScoresList.appendChild(li);
     });
 
-    // Determine winner
-    if (playersArray.length > 0) {
-        const topScore = playersArray[0].score;
-        const winners = playersArray.filter(p => p.score === topScore);
-
-        if (winners.length === 1) {
-            winnerInfo.textContent = winners[0].userId === currentUserId ? "You Win! 🎉" : `${winners[0].username} Wins! 🎉`;
-        } else {
-            winnerInfo.textContent = "It's a Tie! 🤝";
+    let winner = null;
+    if (sortedPlayers.length > 0) {
+        winner = sortedPlayers[0];
+        if (sortedPlayers.length > 1 && sortedPlayers[1].score === winner.score) {
+            winner = null; // It's a tie
         }
+    }
+
+    if (winner) {
+        winnerInfo.textContent = winner.id === currentUserId ? "You Win!" : `${winner.username} Wins!`;
     } else {
-        winnerInfo.textContent = "No scores to display.";
+        winnerInfo.textContent = "It's a Tie!";
     }
 }
 
-
-// --- Initialize on page load ---
-document.addEventListener('DOMContentLoaded', () => {
-    initializeUser(); // This will authenticate the user with your backend
-    showScreen(homeScreen); // Start on the home screen
-    usernameInput.value = currentUsername; // Set initial username from localStorage
+playAgainButton.addEventListener('click', () => {
+    // Reset state for a new game
+    currentRoomId = null;
+    roomState = null;
+    clearInterval(pollingInterval);
+    clearInterval(timerInterval);
+    initializeUser(); // Go back to home screen
 });
+
+returnToHomeButton.addEventListener('click', () => {
+    // Reset state and go home
+    currentRoomId = null;
+    roomState = null;
+    clearInterval(pollingInterval);
+    clearInterval(timerInterval);
+    initializeUser(); // Go back to home screen
+});
+
+
+// --- Initial Setup ---
+document.addEventListener('DOMContentLoaded', initializeUser);

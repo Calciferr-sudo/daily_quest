@@ -6,73 +6,75 @@
     <title>Daily Bloom Quiz</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    </head>
+    <link rel="stylesheet" href="style.css">
+</head>
 <body>
-    <div class="container mx-auto px-4 py-8">
-        <h1 class="text-center mb-8">Daily Bloom Quiz</h1>
+    <div class="container">
+        <h1>Daily Bloom Quiz</h1>
 
-        <div id="errorMessage" class="error-message hidden"></div>
-
-        <div id="homeScreen" class="screen active">
-            <h2 class="mb-6">Ready to Quiz?</h2>
+        <div id="home-screen" class="screen">
+            <h2 class="mb-6 text-indigo-400">Welcome!</h2>
             <div class="input-group">
-                <label for="usernameInput">Your Username:</label>
-                <div class="flex">
-                    <input type="text" id="usernameInput" placeholder="Enter your username" class="flex-grow">
-                    <button id="saveUsernameBtn" class="ml-2 btn">Save</button>
-                </div>
+                <label for="username-input" class="label">Enter Your Username:</label>
+                <input type="text" id="username-input" placeholder="e.g., QuizMaster" class="input-field">
             </div>
-            
+            <button id="save-username-btn" class="btn btn-primary w-full mt-4">Save Username & Continue</button>
+
+            <div class="divider">OR</div>
+
+            <h2 class="mb-4 text-indigo-400">Join a Room</h2>
             <div class="input-group">
-                <label for="difficultySelect">Choose Difficulty:</label>
-                <select id="difficultySelect" class="w-full">
+                <label for="room-id-input" class="label">Enter Room ID:</label>
+                <input type="text" id="room-id-input" placeholder="e.g., ABC123" class="input-field uppercase">
+            </div>
+            <button id="join-room-btn" class="btn btn-secondary w-full mt-4">Join Room</button>
+
+            <div class="divider">OR</div>
+
+            <h2 class="mb-4 text-indigo-400">Create a New Room</h2>
+            <div class="input-group">
+                <label for="difficulty-select" class="label">Select Difficulty:</label>
+                <select id="difficulty-select" class="input-field">
                     <option value="easy">Easy</option>
-                    <option value="medium" selected>Medium</option>
+                    <option value="medium">Medium</option>
                     <option value="hard">Hard</option>
                 </select>
             </div>
-            <button id="createRoomButton" class="btn btn-primary w-full">Create New Room</button>
-
-            <div class="separator">OR</div>
-
-            <div class="input-group">
-                <label for="roomIdInput">Join Existing Room:</label>
-                <input type="text" id="roomIdInput" placeholder="Enter Room ID" class="uppercase">
-            </div>
-            <button id="joinRoomButton" class="btn btn-secondary w-full">Join Room</button>
+            <button id="create-room-btn" class="btn btn-primary w-full mt-4">Create Room</button>
         </div>
 
-        <div id="lobbyScreen" class="screen hidden">
-            <h2 class="mb-6">Lobby</h2>
-            <p id="currentRoomIdDisplay" class="text-xl font-bold text-indigo-400 mb-4">Room ID: ---</p>
-            <h3 class="mb-3">Players in Room:</h3>
-            <ul id="playerListLobby" class="list-disc list-inside bg-gray-700 p-4 rounded-lg mb-6">
-                <li class="p-3 text-teal-700 animate-pulse">Waiting for players...</li>
-            </ul>
-            <button id="startGameButton" class="btn btn-success w-full hidden">Start Game</button>
-            <button id="leaveLobbyButton" class="btn btn-danger w-full mt-4">Leave Lobby</button>
+        <div id="lobby-screen" class="screen hidden">
+            <h2 class="mb-6 text-purple-400">Lobby</h2>
+            <p class="text-xl mb-4">Room ID: <span id="lobby-room-id" class="font-bold text-teal-400"></span></p>
+            <p id="lobby-status" class="text-lg mb-6"></p>
+
+            <h3 class="text-lg font-semibold mb-3">Players:</h3>
+            <ul id="player-list" class="list-disc list-inside mb-6">
+                </ul>
+
+            <button id="start-game-btn" class="btn btn-primary w-full mt-4 hidden">Start Game</button>
+            <button id="leave-lobby-btn" class="btn btn-danger w-full mt-4">Leave Lobby</button>
         </div>
 
-        <div id="gameScreen" class="screen hidden">
-            <h2 class="mb-6">The Quiz Begins!</h2>
-            <p id="roundInfoDisplay" class="text-lg text-purple-400 mb-4">Round X of Y</p>
-            <div class="card bg-gray-700 p-6 rounded-lg mb-6">
-                <p id="timerDisplay" class="text-4xl font-bold text-yellow-400 mb-4">00:00</p>
-                <p id="questionDisplay" class="text-2xl font-semibold mb-4 min-h-[80px]">Loading question...</p>
-                <div id="waitingForQuestionSpinner" class="hidden flex justify-center items-center h-20">
-                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500"></div>
-                </div>
-                <div class="input-group mt-4">
-                    <label for="answerInput" class="text-left">Your answers (comma or new line separated, exactly 8 items):</label>
-                    <textarea id="answerInput" class="w-full p-3 rounded-lg bg-gray-800 text-white" rows="5" placeholder="e.g., Apple, Banana, Orange..."></textarea>
-                    <p id="answerCountDisplay" class="text-right text-red-500 text-sm mt-1">0 / 8 answers</p>
-                </div>
-                <button id="submitAnswerButton" class="btn btn-primary w-full mt-4" disabled>Submit Answers</button>
+        <div id="game-screen" class="screen hidden">
+            <div class="flex justify-between items-center mb-6">
+                <p class="text-lg">Round: <span id="question-counter">1/5</span></p>
+                <p class="text-xl font-bold">Time: <span id="timer" class="text-rose-400">15</span>s</p>
             </div>
 
-            <h3 class="mb-3">Live Scoreboard:</h3>
-            <div id="scoreboard" class="scoreboard">
+            <div class="question-card">
+                <p id="question-text" class="text-2xl font-semibold mb-6"></p>
+                <div id="options-container" class="options-grid">
+                    <textarea id="answer-input" class="input-field text-area" rows="8" placeholder="List your 8 answers, one per line or separated by commas/spaces."></textarea>
+                    <p id="answer-count-display" class="text-sm text-gray-400 mt-2">0/8 items entered</p>
+                </div>
+            </div>
+
+            <button id="submit-answer-btn" class="btn btn-success w-full mt-6">Submit Answers</button>
+            <button id="next-question-btn" class="btn btn-secondary w-full mt-4 hidden">Next Question (Host Only)</button>
+            
+            <h3 class="text-xl font-semibold mt-8 mb-4">Scores:</h3>
+            <div class="scoreboard">
                 <div class="scoreboard-card">
                     <p id="player1NameGame" class="player-name">Player 1</p>
                     <p class="player-score">Score: <span id="player1ScoreGame">0</span></p>
@@ -84,7 +86,7 @@
                     <p id="player2AnswerStatus" class="player-status">Thinking...</p>
                 </div>
             </div>
-             <button id="leaveGameButton" class="btn btn-danger w-full mt-8">Leave Game (Forfeit)</button> 
+             <button id="leaveGameButton" class="btn btn-danger w-full mt-8">Leave Game (Forfeit)</button>
         </div>
 
         <div id="gameOverScreen" class="screen hidden">
@@ -96,18 +98,10 @@
                     </ul>
                 <div class="space-y-4">
                     <button id="playAgainButton" class="btn btn-primary w-full">Play Again</button>
-                    <button id="backToHomeButton" class="btn btn-secondary w-full">Back to Home</button>
+                    <button id="returnToHomeButton" class="btn btn-secondary w-full">Return to Home</button>
                 </div>
             </div>
         </div>
-
-        <div id="messageOverlay" class="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center hidden z-50">
-            <div class="bg-gray-800 p-8 rounded-lg shadow-xl text-center max-w-sm w-full">
-                <p id="messageText" class="text-xl font-semibold text-white mb-6">This is a message.</p>
-                <button id="closeMessageButton" class="btn btn-primary">Got It!</button>
-            </div>
-        </div>
-
     </div>
 
     <script src="script.js"></script>
