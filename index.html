@@ -13,8 +13,7 @@
         <h1>Daily Bloom Quiz</h1>
 
         <div id="error-message" class="error-banner hidden"></div>
-
-        <div id="home-screen" class="screen">
+        <div id="notification-message" class="notification-banner hidden"></div> <div id="home-screen" class="screen">
             <h2 class="mb-6 text-indigo-400">Welcome!</h2>
             <div class="input-group">
                 <label for="username-input" class="label">Enter Your Username:</label>
@@ -26,15 +25,6 @@
 
             <h2 class="mb-4 text-indigo-400">Join a Room</h2>
             <div class="input-group">
-                <label for="room-id-input" class="label">Enter Room ID:</label>
-                <input type="text" id="room-id-input" placeholder="e.g., ABC123" class="input-field uppercase">
-            </div>
-            <button id="join-room-btn" class="btn btn-secondary w-full mt-4">Join Room</button>
-
-            <div class="divider">OR</div>
-
-            <h2 class="mb-4 text-indigo-400">Create a New Room</h2>
-            <div class="input-group">
                 <label for="difficulty-select" class="label">Select Difficulty:</label>
                 <select id="difficulty-select" class="input-field">
                     <option value="easy">Easy</option>
@@ -42,40 +32,46 @@
                     <option value="hard">Hard</option>
                 </select>
             </div>
-            <button id="create-room-btn" class="btn btn-primary w-full mt-4">Create Room</button>
+            <button id="create-room-btn" class="btn btn-secondary w-full mt-4">Create New Room</button>
+
+            <div class="divider">OR</div>
+
+            <h2 class="mb-4 text-indigo-400">Join Existing Room</h2>
+            <div class="input-group">
+                <label for="room-id-input" class="label">Enter Room ID:</label>
+                <input type="text" id="room-id-input" placeholder="e.g., ABCDEF" class="input-field uppercase">
+            </div>
+            <button id="join-room-btn" class="btn btn-secondary w-full mt-4">Join Room</button>
         </div>
 
         <div id="lobby-screen" class="screen hidden">
             <h2 class="mb-6 text-purple-400">Lobby</h2>
-            <p class="text-xl mb-4">Room ID: <span id="lobby-room-id" class="font-bold text-teal-400"></span></p>
-            <p id="lobby-status" class="text-lg mb-6"></p>
+            <p class="text-xl font-semibold mb-4">Room ID: <span id="lobby-room-id" class="text-indigo-400"></span></p>
+            <p id="lobby-status" class="text-lg mb-6 text-slate-400">Waiting for players...</p>
 
-            <h3 class="text-lg font-semibold mb-3">Players:</h3>
-            <ul id="player-list" class="list-disc list-inside mb-6">
+            <h3 class="text-xl font-semibold mb-3 text-slate-700">Players in Room:</h3>
+            <ul id="player-list" class="space-y-2 mb-8">
                 </ul>
 
-            <button id="start-game-btn" class="btn btn-primary w-full mt-4 hidden">Start Game</button>
-            <button id="leave-lobby-btn" class="btn btn-danger w-full mt-4">Leave Lobby</button>
+            <div class="space-y-4">
+                <button id="start-game-btn" class="btn btn-primary w-full hidden">Start Game</button>
+                <button id="leave-lobby-btn" class="btn btn-danger w-full">Leave Room</button>
+            </div>
         </div>
 
         <div id="game-screen" class="screen hidden">
             <div class="flex justify-between items-center mb-6">
-                <p class="text-lg">Round: <span id="question-counter">1/5</span></p>
-                <p class="text-xl font-bold">Time: <span id="timer" class="text-rose-400">15</span>s</p>
+                <p id="question-counter" class="text-xl font-semibold text-teal-400">Question 0 of 5</p>
+                <p id="timer" class="text-2xl font-bold text-rose-400">Time Left: 15s</p>
             </div>
 
-            <div class="question-card">
-                <p id="question-text" class="text-2xl font-semibold mb-6"></p>
+            <div class="card bg-slate-700 p-6 rounded-lg mb-8">
+                <p id="question-text" class="text-2xl font-semibold mb-6">Question goes here?</p>
                 <div id="options-container" class="options-grid">
-                    <textarea id="answer-input" class="input-field text-area" rows="8" placeholder="List your 8 answers, one per line or separated by commas/spaces."></textarea>
-                    <p id="answer-count-display" class="text-sm text-gray-400 mt-2">0/8 items entered</p>
-                </div>
+                    </div>
             </div>
 
-            <button id="submit-answer-btn" class="btn btn-success w-full mt-6">Submit Answers</button>
-            <button id="next-question-btn" class="btn btn-secondary w-full mt-4 hidden">Next Question (Host Only)</button>
-            
-            <h3 class="text-xl font-semibold mt-8 mb-4">Scores:</h3>
+            <h3 class="text-xl font-semibold mb-3 text-slate-700">Scoreboard:</h3>
             <div class="scoreboard">
                 <div class="scoreboard-card">
                     <p id="player1NameGame" class="player-name">Player 1</p>
@@ -88,7 +84,7 @@
                     <p id="player2AnswerStatus" class="player-status">Thinking...</p>
                 </div>
             </div>
-             <button id="leaveGameButton" class="btn btn-danger w-full mt-8">Leave Game (Forfeit)</button>
+             <button id="leaveGameButton" class="btn btn-danger w-full mt-8">Leave Game (Forfeit)</button> 
         </div>
 
         <div id="gameOverScreen" class="screen hidden">
@@ -106,7 +102,7 @@
         </div>
     </div>
 
-    <script src="https://quiz-backend-4u7t.onrender.com/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

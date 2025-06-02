@@ -4,6 +4,7 @@ const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
 const gameOverScreen = document.getElementById('gameOverScreen');
 const errorMessageDisplay = document.getElementById('error-message'); // Ensure this element exists in HTML
+const notificationMessageDisplay = document.getElementById('notification-message'); // NEW: For notifications
 
 // Home Screen Elements
 const usernameInput = document.getElementById('username-input');
@@ -24,509 +25,289 @@ const leaveLobbyBtn = document.getElementById('leave-lobby-btn');
 const questionCounter = document.getElementById('question-counter');
 const timerDisplay = document.getElementById('timer');
 const questionText = document.getElementById('question-text');
-const optionsContainer = document.getElementById('options-container'); // Container for answer input
-const answerInput = document.getElementById('answer-input'); // Textarea for answers
-const answerCountDisplay = document.getElementById('answer-count-display'); // Display for answer count
-const submitAnswerBtn = document.getElementById('submit-answer-btn');
-const nextQuestionBtn = document.getElementById('next-question-btn');
-// Scoreboard elements
-const player1NameGame = document.getElementById('player1NameGame');
-const player1ScoreGame = document.getElementById('player1ScoreGame');
-const player1AnswerStatus = document.getElementById('player1AnswerStatus');
-const player2NameGame = document.getElementById('player2NameGame');
-const player2ScoreGame = document.getElementById('player2ScoreGame');
-const player2AnswerStatus = document.getElementById('player2AnswerStatus');
+const optionsContainer = document.getElementById('options-container'); // Container for answer options buttons
 const leaveGameButton = document.getElementById('leaveGameButton');
 
 // Game Over Screen Elements
-const finalScoresList = document.getElementById('finalScoresList');
+const finalScoresList = document.getElementById('final-scores-list'); // Corrected ID usage for consistency
 const winnerInfo = document.getElementById('winnerInfo');
 const playAgainButton = document.getElementById('playAgainButton');
 const returnToHomeButton = document.getElementById('returnToHomeButton');
 
 
 // --- Game State Variables ---
-const BACKEND_URL = 'https://quiz-backend-4u7t.onrender.com'; // **<<<<< YOUR RENDER BACKEND URL HERE >>>>>**
 let currentUserId = localStorage.getItem('userId');
 let currentUsername = localStorage.getItem('username');
 let currentRoomId = null;
-let roomState = null; // Stores the current state of the room from the backend
-let timerInterval = null;
-let countdownTime = 0;
+let roomState = null; // Stores the latest room state from the backend
+let socket = null; // Socket.IO client instance
+let timerInterval = null; // For the game timer
+let selectedAnswer = null; // To track the user's selected answer
+
+// --- Configuration ---
+const backendUrl = 'https://quiz-backend-4u7t.onrender.com'; // Your Render backend URL
 
 
-// --- Socket.IO Connection ---
-const socket = io(BACKEND_URL); // Connect to your backend's Socket.IO server
-
-socket.on('connect', () => {
-    console.log('Connected to Socket.IO server:', socket.id);
-    if (currentUserId) {
-        // Register user with socket ID on the server after connection
-        socket.emit('registerUserSocket', currentUserId);
-    }
-});
-
-socket.on('disconnect', () => {
-    console.log('Disconnected from Socket.IO server.');
-    // Handle disconnections (e.g., show a message, try to reconnect)
-    showErrorMessage('Disconnected from server. Please refresh or check connection.');
-    clearInterval(timerInterval);
-});
-
-socket.on('connect_error', (error) => {
-    console.error('Socket.IO connection error:', error.message);
-    showErrorMessage('Could not connect to game server. Is the backend running?');
-});
-
-socket.on('error', (message) => {
-    console.error('Server emitted error:', message);
-    showErrorMessage(`Server Error: ${message}`);
-});
-
-socket.on('forceAuth', () => {
-    console.log('Server forcing re-authentication.');
-    showErrorMessage('Your session expired or was invalid. Please set your username again.');
-    localStorage.removeItem('userId');
-    localStorage.removeItem('username');
-    currentUserId = null;
-    currentUsername = null;
-    showScreen(homeScreen);
-    usernameInput.value = '';
-});
-
-socket.on('roomUpdate', (updatedRoomState) => {
-    console.log('Room update received:', updatedRoomState);
-    roomState = updatedRoomState; // Update global room state
-    updateUI(roomState); // Update UI based on the new state
-});
-
-socket.on('roomCreated', (data) => {
-    console.log(`Room ${data.roomId} created and joined.`);
-    currentRoomId = data.roomId;
-    // UI update will happen via roomUpdate event
-});
-
-socket.on('roomDeleted', (data) => {
-    console.log('Room deleted:', data.roomId);
-    if (currentRoomId === data.roomId) {
-        showErrorMessage(data.message || 'The room you were in has been deleted.');
-        clearInterval(timerInterval);
-        currentRoomId = null;
-        roomState = null;
-        showScreen(homeScreen);
-    }
-});
-
-socket.on('answerSubmittedConfirmation', (data) => {
-    console.log(`Answer submitted. Earned ${data.scoreEarned} points.`);
-    // You could show a small temporary message like "Answers received!"
-});
-
-// --- Utility Functions ---
+// --- Screen Management ---
 function showScreen(screen) {
     homeScreen.classList.add('hidden');
     lobbyScreen.classList.add('hidden');
     gameScreen.classList.add('hidden');
-    gameOverScreen.classList.add('hidden');
+    gameOverScreen.classList.add('hidden'); // Ensure game over screen is also hidden
     screen.classList.remove('hidden');
 }
 
+// Function to display error messages
 function showErrorMessage(message) {
-    console.error("Error:", message);
-    errorMessageDisplay.textContent = message;
-    errorMessageDisplay.classList.remove('hidden');
-    // Clear any existing animation before re-adding
-    errorMessageDisplay.style.animation = 'none';
-    errorMessageDisplay.offsetHeight; /* trigger reflow */
-    errorMessageDisplay.style.animation = null;
-    errorMessageDisplay.style.animation = 'fadeOut 5s forwards';
-}
-
-// Function to safely parse user input for 8 answers
-function parseAnswers(text) {
-    // Split by newlines, commas, or spaces, then filter out empty strings and trim
-    const answers = text.split(/[\n, ]+/)
-                      .map(s => s.trim())
-                      .filter(s => s.length > 0);
-    // Ensure we only take up to 8 answers
-    return answers.slice(0, 8);
-}
-
-
-// --- API Call Helper (for initial user setup, not game state updates) ---
-// This still uses HTTP for initial user authentication/username update
-async function apiCall(endpoint, method = 'GET', data = null) {
-    const headers = {
-        'Content-Type': 'application/json',
-        'x-user-id': currentUserId || '', // Always send user ID if available
-        'x-username': currentUsername || '' // Always send username if available
-    };
-
-    const config = {
-        method: method,
-        headers: headers,
-    };
-
-    if (data) {
-        config.body = JSON.stringify(data);
+    if (errorMessageDisplay) {
+        errorMessageDisplay.textContent = message;
+        errorMessageDisplay.classList.remove('hidden');
+        // Hide notification message if an error comes up
+        if (notificationMessageDisplay && !notificationMessageDisplay.classList.contains('hidden')) {
+            notificationMessageDisplay.classList.add('hidden');
+        }
+        setTimeout(() => {
+            errorMessageDisplay.classList.add('hidden');
+        }, 5000);
     }
+}
 
+// NEW Function to display general notifications (not errors)
+function showNotification(message) {
+    if (notificationMessageDisplay) {
+        notificationMessageDisplay.textContent = message;
+        notificationMessageDisplay.classList.remove('hidden');
+        // Hide error message if a notification comes up
+        if (errorMessageDisplay && !errorMessageDisplay.classList.contains('hidden')) {
+            errorMessageDisplay.classList.add('hidden');
+        }
+        setTimeout(() => {
+            notificationMessageDisplay.classList.add('hidden');
+        }, 5000);
+    }
+}
+
+
+// --- API Helper ---
+async function apiCall(url, method = 'GET', body = null) {
     try {
-        const response = await fetch(`${BACKEND_URL}${endpoint}`, config);
-        const result = await response.json();
+        const headers = {
+            'Content-Type': 'application/json',
+            'X-User-Id': currentUserId, // Include user ID in headers
+            'X-Username': currentUsername // Include username in headers
+        };
+        const response = await fetch(backendUrl + url, {
+            method: method,
+            headers: headers,
+            body: body ? JSON.stringify(body) : null
+        });
 
         if (!response.ok) {
-            showErrorMessage(result.message || `API Error: ${response.status}`);
-            throw new Error(result.message || `API Error: ${response.status}`);
-        }
-        return result;
-    } catch (error) {
-        console.error("API call failed:", error);
-        showErrorMessage(`Network or API Error: ${error.message}`);
-        throw error;
-    }
-}
+            const errorData = await response.json();
+            console.error('API Error:', errorData); // Log the full error data
 
-// --- User & Auth ---
-
-async function initializeUser() {
-    if (!currentUserId) {
-        // No user ID in localStorage, prompt for username
-        showScreen(homeScreen);
-        usernameInput.value = ''; // Clear previous input
-    } else {
-        // User ID exists, try to re-authenticate with backend to get current username
-        try {
-            const result = await apiCall('/api/auth/anonymous', 'POST');
-            currentUsername = result.username;
-            localStorage.setItem('username', currentUsername);
-            usernameInput.value = currentUsername; // Prefill username input
-            if (socket.connected) {
-                socket.emit('registerUserSocket', currentUserId); // Register socket for existing user
+            // Improved error handling: show notifications for 400 Bad Requests
+            if (response.status === 400) {
+                showNotification(errorData.message || 'Action failed.');
+                // Reject the promise to indicate failure, but don't re-throw to error banner
+                return Promise.reject(new Error(errorData.message || 'Bad Request'));
+            } else {
+                // For other errors (401, 403, 404, 500 etc.), treat as genuine errors
+                throw new Error(errorData.message || 'API call failed');
             }
-            showScreen(homeScreen); // Go to home screen after initialization
-        } catch (error) {
-            console.error("Failed to re-authenticate user:", error);
-            // If re-authentication fails, clear local storage and force new login
-            currentUserId = null;
-            currentUsername = null;
-            localStorage.removeItem('userId');
-            localStorage.removeItem('username');
-            showScreen(homeScreen);
         }
-    }
-}
 
-saveUsernameBtn.addEventListener('click', async () => {
-    const newUsername = usernameInput.value.trim();
-    if (newUsername.length < 3) {
-        showErrorMessage('Username must be at least 3 characters long.');
-        return;
-    }
-
-    try {
-        let result;
-        if (!currentUserId) {
-            // First time login
-            result = await apiCall('/api/auth/anonymous', 'POST', { username: newUsername });
-        } else {
-            // Update existing username
-            result = await apiCall('/api/user/update-username', 'POST', { newUsername: newUsername });
-        }
-        currentUserId = result.userId;
-        currentUsername = result.username;
-        localStorage.setItem('userId', currentUserId);
-        localStorage.setItem('username', currentUsername);
-        if (socket.connected) {
-            socket.emit('registerUserSocket', currentUserId); // Register socket with new/updated user ID
-        }
-        showScreen(homeScreen); // Stay on home after saving username
-        showErrorMessage('Username saved successfully!');
+        return await response.json();
     } catch (error) {
-        // Error message already handled by apiCall
-    }
-});
-
-
-// --- Room Management (Using Socket.IO for all actions) ---
-
-createRoomBtn.addEventListener('click', () => {
-    if (!currentUserId) {
-        showErrorMessage('Please set your username first.');
-        return;
-    }
-    if (!socket.connected) {
-        showErrorMessage('Not connected to server. Please wait or refresh.');
-        return;
-    }
-    const difficulty = difficultySelect.value;
-    // Emit createRoom event to backend
-    socket.emit('createRoom', { userId: currentUserId, username: currentUsername, difficulty: difficulty });
-    // UI update will happen via roomUpdate event from server
-    showErrorMessage('Creating room...');
-});
-
-joinRoomBtn.addEventListener('click', () => {
-    if (!currentUserId) {
-        showErrorMessage('Please set your username first.');
-        return;
-    }
-    if (!socket.connected) {
-        showErrorMessage('Not connected to server. Please wait or refresh.');
-        return;
-    }
-    const roomId = roomIdInput.value.trim().toUpperCase();
-    if (!roomId) {
-        showErrorMessage('Please enter a Room ID.');
-        return;
-    }
-    // Emit joinRoom event to backend
-    socket.emit('joinRoom', { userId: currentUserId, username: currentUsername, roomId: roomId });
-    // UI update will happen via roomUpdate event from server
-    showErrorMessage(`Joining room ${roomId}...`);
-});
-
-leaveLobbyBtn.addEventListener('click', () => {
-    if (!currentRoomId) return;
-    if (!socket.connected) {
-        showErrorMessage('Not connected to server. Please wait or refresh.');
-        return;
-    }
-    socket.emit('leaveRoom', { roomId: currentRoomId, userId: currentUserId });
-    clearInterval(timerInterval);
-    currentRoomId = null;
-    roomState = null;
-    showScreen(homeScreen);
-    showErrorMessage('Left lobby.');
-});
-
-leaveGameButton.addEventListener('click', () => {
-    if (!currentRoomId) return;
-    if (!socket.connected) {
-        showErrorMessage('Not connected to server. Please wait or refresh.');
-        return;
-    }
-    socket.emit('leaveRoom', { roomId: currentRoomId, userId: currentUserId });
-    clearInterval(timerInterval);
-    currentRoomId = null;
-    roomState = null;
-    showScreen(homeScreen);
-    showErrorMessage('Left game.');
-});
-
-
-// --- UI Update Logic (driven by Socket.IO 'roomUpdate' event) ---
-function updateUI(room) {
-    if (!room) { // Handle cases where room might be null after deletion
-        showScreen(homeScreen);
-        return;
-    }
-
-    if (room.status === 'waiting') {
-        updateLobbyUI(room);
-        showScreen(lobbyScreen);
-    } else if (room.status === 'playing') {
-        if (gameScreen.classList.contains('hidden')) { // Only initialize if just entering game screen
-            startGameUI(room);
-        }
-        updateGameUI(room); // Always update game screen
-    } else if (room.status === 'finished') {
-        showScreen(gameOverScreen);
-        updateResultsScreen(room);
-        clearInterval(timerInterval); // Stop timer
+        console.error('Network or API call failed:', error);
+        // Only show actual network errors or unhandled API errors in the error banner
+        showErrorMessage("Network or API Error: " + error.message);
+        throw error; // Re-throw to propagate for specific handling if needed
     }
 }
 
-function updateLobbyUI(room) {
+// --- Socket.IO Setup ---
+function setupSocket(roomId) {
+    if (socket) {
+        socket.disconnect(); // Disconnect existing socket if any
+    }
+    // Connect to your backend's Socket.IO server
+    socket = io(backendUrl, {
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        transports: ['polling', 'websocket'] // Explicitly define transports
+    });
+
+    socket.on('connect', () => {
+        console.log('Socket.IO connected:', socket.id);
+        socket.emit('joinRoomSocket', { roomId, userId: currentUserId });
+    });
+
+    socket.on('connect_error', (error) => {
+        console.error('Socket.IO connection error:', error.message);
+        showErrorMessage('Socket connection error: ' + error.message);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('Socket.IO disconnected:', reason);
+        if (reason === 'io server disconnect') {
+            // The server initiated the disconnect
+            showErrorMessage('Disconnected from server. Room may have been deleted.');
+            // Optionally redirect to home screen or try to reconnect
+            initializeUser(); // Go back to home
+        } else {
+            // Other reasons, e.g., network error, client disconnect
+            showErrorMessage('Lost connection to game server. Attempting to reconnect...');
+        }
+    });
+
+    socket.on('roomState', (room) => {
+        console.log('Received roomState update:', room); // Crucial for debugging
+        roomState = room; // Update global roomState
+
+        // Update UI based on room status
+        if (roomState.status === 'waiting') {
+            showScreen(lobbyScreen);
+            updateLobbyScreen(roomState);
+        } else if (roomState.status === 'playing') {
+            showScreen(gameScreen);
+            updateGameScreen(roomState);
+            startClientTimer(roomState.roundStartTime); // Use roundStartTime from backend
+        } else if (roomState.status === 'finished') {
+            showScreen(gameOverScreen);
+            updateResultsScreen(roomState);
+            clearInterval(timerInterval); // Stop any running timer
+        }
+    });
+
+    socket.on('roomDeleted', (data) => {
+        console.warn('Room deleted:', data.message);
+        showErrorMessage(data.message || 'The room you were in has been deleted.');
+        clearInterval(timerInterval);
+        currentRoomId = null;
+        roomState = null;
+        initializeUser(); // Redirect to home screen
+    });
+
+    socket.on('error', (data) => {
+        console.error('Socket error event:', data);
+        showErrorMessage(data.message || 'An unexpected socket error occurred.');
+    });
+}
+
+// --- Game UI Updates ---
+
+function updateLobbyScreen(room) {
     lobbyRoomId.textContent = room.roomId;
     playerList.innerHTML = ''; // Clear existing players
     room.players.forEach(player => {
         const li = document.createElement('li');
-        li.textContent = `${player.username} ${player.id === currentUserId ? '(You)' : ''}`;
+        li.textContent = `${player.username} ${player.id === room.hostId ? '(Host)' : ''} ${player.id === currentUserId ? '(You)' : ''}`;
         playerList.appendChild(li);
     });
 
     if (room.hostId === currentUserId) {
-        lobbyStatus.textContent = `You are the host. Waiting for 2 players...`;
-        startGameBtn.classList.toggle('hidden', room.players.length < 2);
-    } else {
-        lobbyStatus.textContent = `Waiting for host to start the game.`;
-        startGameBtn.classList.add('hidden');
-    }
-}
-
-// --- Game Logic ---
-startGameBtn.addEventListener('click', () => {
-    if (!currentRoomId || !roomState || roomState.hostId !== currentUserId) {
-        showErrorMessage('You are not the host or not in a room.');
-        return;
-    }
-    if (roomState.players.length < 2) {
-        showErrorMessage('Need 2 players to start the game.');
-        return;
-    }
-    if (!socket.connected) {
-        showErrorMessage('Not connected to server. Please wait or refresh.');
-        return;
-    }
-    socket.emit('startGame', { roomId: currentRoomId, userId: currentUserId });
-});
-
-function startGameUI(room) {
-    clearInterval(timerInterval); // Ensure no old timer is running
-    answerInput.value = ''; // Clear previous answers
-    answerInput.disabled = false;
-    submitAnswerBtn.disabled = false;
-    nextQuestionBtn.classList.add('hidden'); // Only host can see this after round ends
-    answerInput.addEventListener('input', updateAnswerCount); // Add event listener for live count
-    updateAnswerCount(); // Initial count
-    updateGameUI(room); // Update initial game state UI
-    // If roundStartTime is updated by server, restart timer
-    if (room.roundStartTime) {
-        startRoundTimer(room.roundStartTime);
-    }
-}
-
-function updateGameUI(room) {
-    questionCounter.textContent = `${room.currentRound}/${room.maxRounds}`;
-    questionText.textContent = room.currentQuestion ? room.currentQuestion.question : 'Loading question...';
-
-    // Update scoreboard
-    // Find players and update dynamically
-    const playersInOrder = room.players.sort((a,b) => {
-        if (a.id === currentUserId) return -1; // Current user first
-        if (b.id === currentUserId) return 1;
-        return 0; // Maintain existing order for others
-    });
-
-    const p1 = playersInOrder[0];
-    const p2 = playersInOrder[1];
-
-    if (p1) {
-        player1NameGame.textContent = `${p1.username} ${p1.id === currentUserId ? '(You)' : ''}`;
-        player1ScoreGame.textContent = p1.score;
-        player1AnswerStatus.textContent = p1.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
-        player1AnswerStatus.className = p1.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
-    } else { // Hide if less than 1 player
-        player1NameGame.textContent = '';
-        player1ScoreGame.textContent = '0';
-        player1AnswerStatus.textContent = '';
-        player1AnswerStatus.className = 'player-status';
-    }
-    
-    if (p2) {
-        player2NameGame.textContent = `${p2.username} ${p2.id === currentUserId ? '(You)' : ''}`;
-        player2ScoreGame.textContent = p2.score;
-        player2AnswerStatus.textContent = p2.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
-        player2AnswerStatus.className = p2.hasAnsweredCurrentRound ? 'player-status text-green-400' : 'player-status text-yellow-400';
-    } else { // Hide if less than 2 players
-        player2NameGame.textContent = '';
-        player2ScoreGame.textContent = '0';
-        player2AnswerStatus.textContent = '';
-        player2AnswerStatus.className = 'player-status';
-    }
-
-    // Host specific UI for next question button
-    const allPlayersAnswered = room.players.every(p => p.hasAnsweredCurrentRound);
-    const roundEnded = (Date.now() - room.roundStartTime) >= 15000; // Check if 15 seconds passed based on server time
-
-    if (room.hostId === currentUserId && (allPlayersAnswered || roundEnded)) {
-        nextQuestionBtn.classList.remove('hidden');
-    } else {
-        nextQuestionBtn.classList.add('hidden');
-    }
-
-    // Disable input/submit if current user has answered or round time is up
-    const currentUserHasAnswered = room.players.find(p => p.id === currentUserId)?.hasAnsweredCurrentRound;
-    if (currentUserHasAnswered || roundEnded) {
-        answerInput.disabled = true;
-        submitAnswerBtn.disabled = true;
-    } else {
-        answerInput.disabled = false;
-        submitAnswerBtn.disabled = false;
-    }
-
-    // Restart timer if round has advanced
-    if (room.status === 'playing' && room.roundStartTime && (Date.now() - room.roundStartTime) < 15000) {
-        startRoundTimer(room.roundStartTime);
-    } else if (room.status === 'playing' && (Date.now() - room.roundStartTime) >= 15000) {
-        // If time has run out, ensure timer shows 0
-        clearInterval(timerInterval);
-        timerDisplay.textContent = '0';
-    }
-}
-
-function startRoundTimer(startTime) {
-    clearInterval(timerInterval);
-    const roundDuration = 15; // seconds
-
-    timerInterval = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        const remaining = roundDuration - elapsed;
-        countdownTime = Math.max(0, remaining); // Ensure it doesn't go negative
-        timerDisplay.textContent = countdownTime;
-
-        if (countdownTime <= 0) {
-            clearInterval(timerInterval);
-            timerDisplay.textContent = '0';
-            answerInput.disabled = true;
-            submitAnswerBtn.disabled = true;
+        // Current user is the host
+        startGameBtn.classList.remove('hidden');
+        lobbyStatus.textContent = `You are the host. Waiting for players... (${room.players.length}/2)`; // Assuming 2 players for simplicity
+        if (room.players.length >= 2) { // Enable start game button if enough players
+            startGameBtn.disabled = false;
+        } else {
+            startGameBtn.disabled = true;
         }
-    }, 1000);
+    } else {
+        // Current user is a player
+        startGameBtn.classList.add('hidden');
+        lobbyStatus.textContent = `Waiting for host to start game... (${room.players.length}/2)`;
+    }
 }
 
-// Live update answer count for textarea
-function updateAnswerCount() {
-    const answers = parseAnswers(answerInput.value);
-    answerCountDisplay.textContent = `${answers.length}/8 items entered`;
+function updateGameScreen(room) {
+    console.log('Updating game screen with room:', room); // Debugging
+    if (!room.questions || room.questions.length === 0) {
+        console.error("No questions found in room state!"); // Debugging
+        questionText.textContent = "Error: No questions loaded. Please ask the host to restart the game.";
+        optionsContainer.innerHTML = ''; // Clear options
+        return;
+    }
+
+    const currentQuestion = room.questions[room.currentQuestionIndex];
+    console.log('Current Question to display:', currentQuestion); // Debugging
+
+    if (currentQuestion) {
+        questionCounter.textContent = `Question ${room.currentQuestionIndex + 1} of ${room.maxRounds}`;
+        questionText.textContent = currentQuestion.question;
+
+        optionsContainer.innerHTML = ''; // Clear previous options
+        selectedAnswer = null; // Reset selected answer for new question
+
+        currentQuestion.answers.forEach(answer => {
+            const button = document.createElement('button');
+            button.textContent = answer;
+            button.classList.add('btn', 'options-grid-item', 'option-button', 'w-full');
+            button.addEventListener('click', () => selectAnswer(answer));
+            optionsContainer.appendChild(button);
+        });
+
+        // Disable options if already answered
+        const player = room.players.find(p => p.id === currentUserId);
+        if (player && player.hasAnsweredCurrentRound) {
+            disableAnswerOptions();
+            highlightSelectedAnswer(room.answersReceived[currentUserId]);
+            // Optionally, show correct answer here if applicable
+            // For now, assume correct answer is shown after round ends or on next state update
+        } else {
+            enableAnswerOptions();
+        }
+    } else {
+        console.error("currentQuestion is undefined in updateGameScreen!", room.currentQuestionIndex, room.questions);
+        questionText.textContent = "Error: Question data is missing.";
+        optionsContainer.innerHTML = '';
+    }
+
+    updateScoreboard(room);
 }
 
-submitAnswerBtn.addEventListener('click', () => {
-    if (!currentRoomId || !roomState) {
-        showErrorMessage('Not in a game room.');
-        return;
-    }
-    if (!socket.connected) {
-        showErrorMessage('Not connected to server. Please wait or refresh.');
-        return;
-    }
-    const answers = parseAnswers(answerInput.value);
-    if (answers.length === 0) {
-        showErrorMessage('Please enter at least one answer.');
-        return;
-    }
-    // Emit submitAnswer event to backend
-    socket.emit('submitAnswer', {
-        roomId: currentRoomId,
-        userId: currentUserId,
-        round: roomState.currentRound,
-        answers: answers
-    });
-    // UI will be updated by 'roomUpdate' event from server
-    answerInput.disabled = true;
-    submitAnswerBtn.disabled = true;
-    showErrorMessage('Answers submitted, waiting for opponent/round end.');
-});
+function updateScoreboard(room) {
+    const player1NameGame = document.getElementById('player1NameGame');
+    const player1ScoreGame = document.getElementById('player1ScoreGame');
+    const player1AnswerStatus = document.getElementById('player1AnswerStatus');
+    const player2NameGame = document.getElementById('player2NameGame');
+    const player2ScoreGame = document.getElementById('player2ScoreGame');
+    const player2AnswerStatus = document.getElementById('player2AnswerStatus');
 
-nextQuestionBtn.addEventListener('click', () => {
-    if (!currentRoomId || !roomState || roomState.hostId !== currentUserId) {
-        showErrorMessage('You are not the host or not in a room.');
-        return;
+    // Assuming exactly two players for simple scoreboard display
+    const player1 = room.players[0];
+    const player2 = room.players[1];
+
+    if (player1) {
+        player1NameGame.textContent = player1.username + (player1.id === currentUserId ? ' (You)' : '');
+        player1ScoreGame.textContent = player1.score;
+        player1AnswerStatus.textContent = player1.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
+        player1AnswerStatus.style.color = player1.hasAnsweredCurrentRound ? '#48bb78' : '#a0aec0'; // Green for answered
+    } else {
+        player1NameGame.textContent = 'Player 1';
+        player1ScoreGame.textContent = '0';
+        player1AnswerStatus.textContent = 'Waiting...';
     }
-    if (!socket.connected) {
-        showErrorMessage('Not connected to server. Please wait or refresh.');
-        return;
+
+    if (player2) {
+        player2NameGame.textContent = player2.username + (player2.id === currentUserId ? ' (You)' : '');
+        player2ScoreGame.textContent = player2.score;
+        player2AnswerStatus.textContent = player2.hasAnsweredCurrentRound ? 'Answered' : 'Thinking...';
+        player2AnswerStatus.style.color = player2.hasAnsweredCurrentRound ? '#48bb78' : '#a0aec0';
+    } else {
+        player2NameGame.textContent = 'Player 2';
+        player2ScoreGame.textContent = '0';
+        player2AnswerStatus.textContent = 'Waiting...';
     }
-    socket.emit('nextRound', { roomId: currentRoomId, userId: currentUserId });
-    // UI will be updated by 'roomUpdate' event from server
-});
+}
 
 
-// --- Game Over Screen Logic ---
 function updateResultsScreen(room) {
     finalScoresList.innerHTML = '';
-    // Sort players by score in descending order
-    const sortedPlayers = room.players.sort((a, b) => b.score - a.score);
+    const sortedPlayers = room.players.sort((a, b) => b.score - a.score); // Sort by score descending
 
     sortedPlayers.forEach(player => {
         const li = document.createElement('li');
@@ -553,13 +334,224 @@ function updateResultsScreen(room) {
     }
 }
 
+
+// --- Game Logic ---
+
+function selectAnswer(answer) {
+    selectedAnswer = answer;
+    // Highlight the selected button and disable others
+    Array.from(optionsContainer.children).forEach(button => {
+        button.classList.remove('selected');
+        button.disabled = true; // Disable all after selection
+        if (button.textContent === answer) {
+            button.classList.add('selected');
+        }
+    });
+    submitAnswer(answer);
+}
+
+function disableAnswerOptions() {
+    Array.from(optionsContainer.children).forEach(button => {
+        button.disabled = true;
+    });
+}
+
+function enableAnswerOptions() {
+    Array.from(optionsContainer.children).forEach(button => {
+        button.disabled = false;
+        button.classList.remove('selected', 'correct', 'incorrect'); // Clear any previous states
+    });
+}
+
+function highlightSelectedAnswer(answer) {
+    Array.from(optionsContainer.children).forEach(button => {
+        if (button.textContent === answer) {
+            button.classList.add('selected');
+        }
+    });
+}
+
+
+async function submitAnswer(answer) {
+    if (!currentRoomId || !currentUserId || !answer) {
+        console.error("Cannot submit answer: Missing room ID, user ID, or answer.");
+        showErrorMessage("Could not submit answer. Please try again.");
+        return;
+    }
+    try {
+        const response = await apiCall(`/api/rooms/${currentRoomId}/answer`, 'POST', { answer });
+        console.log('Answer submission response:', response);
+        // The roomState update from backend will handle UI changes
+    } catch (error) {
+        console.error("Error submitting answer:", error.message);
+        // showErrorMessage(error.message); // apiCall now handles display for 400s
+    }
+}
+
+function startClientTimer(endTime) {
+    clearInterval(timerInterval); // Clear any existing timer
+    const countdownElement = timerDisplay;
+
+    const updateTimer = () => {
+        const now = Date.now();
+        const timeLeft = Math.max(0, Math.floor((endTime - now) / 1000)); // Time in seconds
+
+        countdownElement.textContent = `Time Left: ${timeLeft}s`;
+
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            countdownElement.textContent = 'Time Up!';
+            disableAnswerOptions();
+            // Host logic will likely trigger next question via roomState update
+            // if (roomState.hostId === currentUserId && !roomState.players.every(p => p.hasAnsweredCurrentRound)) {
+            //     // Optional: Host sends signal to move to next question if time runs out and not all answered
+            //     // await apiCall(`/api/rooms/${currentRoomId}/next-question`, 'POST');
+            // }
+        }
+    };
+
+    updateTimer(); // Call immediately to show initial time
+    timerInterval = setInterval(updateTimer, 1000);
+}
+
+
+// --- Event Listeners ---
+
+// Home Screen Actions
+saveUsernameBtn.addEventListener('click', () => {
+    const username = usernameInput.value.trim();
+    if (username.length >= 3) {
+        // Authenticate anonymously
+        apiCall('/api/auth/anonymous', 'POST', { username })
+            .then(data => {
+                currentUserId = data.userId;
+                currentUsername = data.username;
+                localStorage.setItem('userId', currentUserId);
+                localStorage.setItem('username', currentUsername);
+                showNotification(`Welcome, ${currentUsername}!`);
+                showScreen(lobbyScreen); // Move to lobby/room creation screen
+                // Ensure socket is initialized AFTER user is authenticated
+                // We will defer socket setup until a room is joined/created
+            })
+            .catch(error => {
+                console.error('Authentication error:', error.message);
+                // showErrorMessage(error.message); // apiCall already handles this
+            });
+    } else {
+        showErrorMessage("Username must be at least 3 characters long.");
+    }
+});
+
+createRoomBtn.addEventListener('click', async () => {
+    if (!currentUserId) {
+        showErrorMessage("Please save your username first.");
+        return;
+    }
+    const difficulty = difficultySelect.value;
+    try {
+        const response = await apiCall('/api/rooms', 'POST', { difficulty });
+        currentRoomId = response.roomId;
+        setupSocket(currentRoomId); // Setup socket AFTER room is created
+        showNotification(`Room ${currentRoomId} created! Waiting for players...`);
+        // updateLobbyScreen will be called by socket.on('roomState')
+    } catch (error) {
+        console.error('Error creating room:', error.message);
+        // showErrorMessage(error.message); // apiCall already handles this
+    }
+});
+
+joinRoomBtn.addEventListener('click', async () => {
+    if (!currentUserId) {
+        showErrorMessage("Please save your username first.");
+        return;
+    }
+    const enteredRoomId = roomIdInput.value.trim();
+    if (enteredRoomId.length !== 6) {
+        showErrorMessage("Room ID must be 6 characters long.");
+        return;
+    }
+    try {
+        const response = await apiCall('/api/rooms/join', 'POST', { roomId: enteredRoomId });
+        currentRoomId = response.roomId;
+        setupSocket(currentRoomId); // Setup socket AFTER joining room
+        showNotification(`Joined room ${currentRoomId}!`);
+        // updateLobbyScreen will be called by socket.on('roomState')
+    } catch (error) {
+        console.error('Error joining room:', error.message);
+        // showErrorMessage(error.message); // apiCall already handles this
+    }
+});
+
+// Lobby Screen Actions
+startGameBtn.addEventListener('click', async () => {
+    if (!currentRoomId) {
+        showErrorMessage("You must be in a room to start the game.");
+        return;
+    }
+    try {
+        const response = await apiCall(`/api/rooms/${currentRoomId}/start`, 'POST'); // No need for userId in body, already in headers
+        console.log("Game start request sent. Waiting for room state update.");
+        // The backend emits roomState, so frontend should react to that.
+        // No direct screen transition here, it's handled by socket.on('roomState')
+    } catch (error) {
+        console.error("Error starting game:", error.message);
+        // showErrorMessage(error.message); // apiCall now handles display for 400s
+    }
+});
+
+leaveLobbyBtn.addEventListener('click', async () => {
+    if (!currentRoomId) {
+        showErrorMessage("Not in a room to leave.");
+        return;
+    }
+    try {
+        const response = await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
+        console.log(response.message);
+        showNotification('You have left the room.');
+        clearInterval(timerInterval);
+        currentRoomId = null;
+        roomState = null;
+        if (socket) {
+            socket.disconnect(); // Disconnect socket when leaving room
+        }
+        initializeUser(); // Go back to home screen
+    } catch (error) {
+        console.error("Error leaving room:", error.message);
+        // showErrorMessage(error.message); // apiCall already handles this
+    }
+});
+
+// Game Screen Actions
+leaveGameButton.addEventListener('click', async () => {
+    if (!currentRoomId) {
+        showErrorMessage("No game in progress to leave.");
+        return;
+    }
+    try {
+        const response = await apiCall(`/api/rooms/${currentRoomId}/leave`, 'POST');
+        console.log(response.message);
+        showNotification('You have left the game.');
+        clearInterval(timerInterval);
+        currentRoomId = null;
+        roomState = null;
+        if (socket) {
+            socket.disconnect(); // Disconnect socket when leaving game
+        }
+        initializeUser(); // Go back to home screen
+    } catch (error) {
+        console.error("Error leaving game:", error.message);
+        // showErrorMessage(error.message); // apiCall already handles this
+    }
+});
+
+// Game Over Screen Actions
 playAgainButton.addEventListener('click', () => {
     // Reset state for a new game
-    currentRoomId = null;
+    currentRoomId = null; // Important to clear current room ID
     roomState = null;
     clearInterval(timerInterval);
-    // Don't disconnect socket, just prepare for new game
-    initializeUser(); // Go back to home screen
+    // Don't disconnect socket here, let initializeUser handle re-authentication if needed
+    initializeUser(); // Go back to home screen (will setup a new game flow)
 });
 
 returnToHomeButton.addEventListener('click', () => {
@@ -567,10 +559,25 @@ returnToHomeButton.addEventListener('click', () => {
     currentRoomId = null;
     roomState = null;
     clearInterval(timerInterval);
-    // Don't disconnect socket, just prepare for new game
+    if (socket) {
+        socket.disconnect(); // Disconnect socket when returning home
+    }
     initializeUser(); // Go back to home screen
 });
 
 
-// --- Initial Setup ---
-document.addEventListener('DOMContentLoaded', initializeUser);
+// --- Initialization ---
+function initializeUser() {
+    if (currentUserId && currentUsername) {
+        // If user already has ID/username, skip home screen and go to lobby options
+        showScreen(lobbyScreen);
+        usernameInput.value = currentUsername; // Prefill username input
+        showNotification(`Welcome back, ${currentUsername}!`);
+    } else {
+        // No existing user, show home screen to create username
+        showScreen(homeScreen);
+    }
+}
+
+// Call initialize when script loads
+initializeUser();
